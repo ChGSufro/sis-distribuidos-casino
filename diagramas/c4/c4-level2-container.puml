@@ -1,0 +1,77 @@
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_TOP_DOWN()
+LAYOUT_WITH_LEGEND()
+
+title C4 Container Diagram - Casino Online System
+
+Person(player, "Jugador (Player)")
+
+System_Boundary(casino, "Sistema de Casino Online") {
+
+    Container(frontend, "Frontend")
+
+    Container(gateway, "API Gateway")
+
+    System_Boundary(services_layer, "Capa de Servicios de Negocio") {
+
+        Container(auth_svc, "Auth & Users Service", "Go + gRPC")
+        Container(wallet_svc, "Wallet Service", "Go + gRPC")
+        Container(bj_svc, "Blackjack Game Service", "Go + gRPC")
+        Container(poker_svc, "Poker Game Service", "Go + gRPC")
+        Container(history_svc, "History & Audit Service", "Go + gRPC")
+        Container(stats_svc, "Leaderboard & Stats Service", "Go + gRPC")
+    }
+
+    System_Boundary(persistence_layer, "Capa de Persistencia") {
+
+        ContainerDb(users_db, "users_db", "PostgreSQL")
+
+        ContainerDb(wallet_db, "wallet_db", "PostgreSQL")
+
+        ContainerDb(bj_state_db, "bj_state_db", "MongoDB")
+
+        ContainerDb(poker_state_db, "poker_state_db", "MongoDB")
+
+        ContainerDb(audit_db, "audit_history_db", "MongoDB")
+
+        ContainerDb(stats_db, "stats_db", "MongoDB")
+    }
+}
+
+' Relaciones: Frontend <-> Gateway
+Rel(player, frontend, "Usa el casino", "HTTPS/WebSocket")
+Rel(frontend, gateway, "Conecta via", "HTTPS/WebSocket")
+
+' Relaciones: Gateway -> Servicios
+Rel(gateway, auth_svc, "Autentica y autoriza", "gRPC")
+Rel(gateway, wallet_svc, "Consulta y opera creditos", "gRPC")
+Rel(gateway, bj_svc, "Gestiona partidas Blackjack", "gRPC/WS Stream")
+Rel(gateway, poker_svc, "Gestiona partidas Poker", "gRPC/WS Stream")
+Rel(gateway, history_svc, "Consulta historial", "gRPC")
+Rel(gateway, stats_svc, "Consulta rankings", "gRPC")
+
+' Relaciones: Auth -> Wallet (InitWallet)
+Rel(auth_svc, wallet_svc, "InitWallet al registrar usuario", "gRPC")
+
+' Relaciones: Juegos -> Wallet (apuestas)
+Rel(bj_svc, wallet_svc, "Hold/Settle Bets", "gRPC")
+Rel(poker_svc, wallet_svc, "BuyIn/Payout", "gRPC")
+
+' Relaciones: Juegos -> History (auditoria)
+Rel(bj_svc, history_svc, "RecordHandAudit", "gRPC")
+Rel(poker_svc, history_svc, "RecordTableAudit", "gRPC")
+
+' Relaciones: History -> Stats (eventos)
+Rel(history_svc, stats_svc, "Stream de Eventos", "gRPC")
+
+' Relaciones: Servicios -> Bases de Datos
+Rel(auth_svc, users_db, "Lee y escribe credenciales", "SQL/TCP")
+Rel(wallet_svc, wallet_db, "Operaciones ACID sobre ledger", "SQL/TCP")
+Rel(bj_svc, bj_state_db, "Lee y escribe estado de manos", "MongoDB Protocol")
+Rel(poker_svc, poker_state_db, "Lee y escribe estado de mesas", "MongoDB Protocol")
+Rel(history_svc, audit_db, "Inserta logs inmutables", "MongoDB Protocol")
+Rel(stats_svc, stats_db, "Actualiza rankings y series", "MongoDB Protocol")
+
+@enduml

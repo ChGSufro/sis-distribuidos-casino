@@ -1,0 +1,14 @@
+@startuml
+!include <C4/C4_Context>
+
+LAYOUT_WITH_LEGEND()
+
+title C4 System Context Diagram - Casino Online System
+
+Person(player, "Jugador (Player)", "Usuario que accede al casino desde\nFrontend Web o Mobile para jugar,\ngestionar creditos y ver estadisticas.")
+
+System(casino, "Sistema de Casino Online", "Plataforma de casino con arquitectura\nde microservicios distribuidos.\nOfrece Blackjack, Poker, gestion de\ncreditos virtuales y rankings.")
+
+Rel(player, casino, "Juega, gestiona creditos, consulta estadisticas", "HTTPS/WebSocket")
+
+@enduml
