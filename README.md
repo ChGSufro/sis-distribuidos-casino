@@ -587,7 +587,786 @@ de manos o mesas.
 
 ---
 
-### 4. Resumen de Bases de Datos por Servicio
+### 4. Contratos entre Servicios (Interfaces y DTOs)
+
+Esta sección define **qué datos se envían y reciben** entre cada par de
+servicios. Cada operación muestra su solicitud y respuesta como objetos DTO
+(Data Transfer Object) con el tipo y propósito de cada campo.
+
+> **Convención:** todos los montos monetarios están en **centavos** (enteros)
+> para evitar errores de punto flotante. Los identificadores de usuario son
+> siempre el `UUID` emitido por el Auth Service.
+
+---
+
+#### 4.1 Auth & Users Service
+
+Operaciones que este servicio expone. Es llamado por el **API Gateway**
+(acciones del usuario) y llama al **Wallet Service** al registrar un usuario.
+
+##### `Register`
+
+**Flujo:** Frontend → Gateway → Auth Service → _(internamente llama `InitWallet` al Wallet Service)_
+
+**Solicitud:**
+```json
+{
+  "username": "String — nombre de usuario deseado",
+  "email": "String — correo electrónico",
+  "password": "String — contraseña en texto plano (se hashea en el servicio)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "userId": "UUID — identificador del usuario creado",
+  "username": "String",
+  "email": "String",
+  "createdAt": "ISODate"
+}
+```
+
+##### `Login`
+
+**Flujo:** Frontend → Gateway → Auth Service
+
+**Solicitud:**
+```json
+{
+  "email": "String — correo electrónico",
+  "password": "String — contraseña en texto plano"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "accessToken": "String — JWT firmado para autenticar solicitudes",
+  "refreshToken": "String — token para renovar el accessToken sin re-login",
+  "expiresAt": "ISODate — fecha de expiración del accessToken",
+  "user": {
+    "userId": "UUID",
+    "username": "String",
+    "status": "String — active | inactive | banned"
+  }
+}
+```
+
+##### `ValidateToken`
+
+**Flujo:** Gateway → Auth Service _(en cada solicitud entrante para validar el JWT)_
+
+**Solicitud:**
+```json
+{
+  "accessToken": "String — JWT enviado por el frontend"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "valid": "Boolean — true si el token es válido y no está revocado",
+  "userId": "UUID — identificador del usuario autenticado",
+  "username": "String"
+}
+```
+
+##### `RefreshToken`
+
+**Flujo:** Frontend → Gateway → Auth Service
+
+**Solicitud:**
+```json
+{
+  "refreshToken": "String — refresh token vigente"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "accessToken": "String — nuevo JWT",
+  "refreshToken": "String — nuevo refresh token (rotación)",
+  "expiresAt": "ISODate"
+}
+```
+
+##### `Logout`
+
+**Flujo:** Frontend → Gateway → Auth Service
+
+**Solicitud:**
+```json
+{
+  "accessToken": "String — token a revocar"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "success": "Boolean"
+}
+```
+
+##### `GetProfile`
+
+**Flujo:** Frontend → Gateway → Auth Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "userId": "UUID",
+  "username": "String",
+  "email": "String",
+  "status": "String — active | inactive | banned",
+  "createdAt": "ISODate",
+  "lastLoginAt": "ISODate | null"
+}
+```
+
+---
+
+#### 4.2 Wallet Service
+
+Operaciones para gestionar créditos virtuales. Es llamado por el **Gateway**
+(consultas del usuario), por el **Auth Service** (al registrar), y por los
+**servicios de juego** (para reservar y liquidar apuestas).
+
+##### `InitWallet`
+
+**Flujo:** Auth Service → Wallet Service _(al registrar un nuevo usuario)_
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID — usuario para el cual crear la billetera"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "walletId": "UUID",
+  "balanceCents": "Number — saldo inicial (0)"
+}
+```
+
+##### `GetBalance`
+
+**Flujo:** Frontend → Gateway → Wallet Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "userId": "UUID",
+  "balanceCents": "Number — saldo disponible en centavos",
+  "updatedAt": "ISODate"
+}
+```
+
+##### `Deposit`
+
+**Flujo:** Frontend → Gateway → Wallet Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID",
+  "amountCents": "Number — monto a depositar (> 0)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "transactionId": "UUID — identificador de la transacción de depósito",
+  "newBalanceCents": "Number — saldo después del depósito"
+}
+```
+
+##### `Hold`
+
+**Flujo:** Blackjack / Poker Service → Wallet Service _(reservar fondos antes de jugar)_
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID",
+  "amountCents": "Number — monto a reservar (> 0)",
+  "gameType": "String — 'blackjack' | 'poker'",
+  "gameRefId": "UUID — referencia a la mano (BJ) o mesa (Poker)",
+  "idempotencyKey": "String — clave única para evitar reservas duplicadas"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "holdId": "UUID — identificador de la reserva creada",
+  "amountCents": "Number — monto efectivamente reservado",
+  "status": "String — 'active'"
+}
+```
+
+##### `Settle`
+
+**Flujo:** Blackjack / Poker Service → Wallet Service _(liquidar una reserva, devolviendo ganancias)_
+
+**Solicitud:**
+```json
+{
+  "holdId": "UUID — reserva a liquidar",
+  "winAmountCents": "Number — monto ganado a abonar (0 si perdió todo)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "holdId": "UUID",
+  "status": "String — 'settled'",
+  "transactionId": "UUID",
+  "newBalanceCents": "Number — saldo después de la liquidación"
+}
+```
+
+##### `Release`
+
+**Flujo:** Blackjack Service → Wallet Service _(cancelar una reserva y devolver fondos completos)_
+
+**Solicitud:**
+```json
+{
+  "holdId": "UUID — reserva a liberar"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "holdId": "UUID",
+  "status": "String — 'released'",
+  "transactionId": "UUID",
+  "newBalanceCents": "Number — saldo después de liberar la reserva"
+}
+```
+
+---
+
+#### 4.3 Blackjack Game Service
+
+Operaciones para jugar Blackjack. Es llamado por el **Gateway** (acciones del
+jugador vía WebSocket) y llama internamente al **Wallet Service** y al
+**History Service**.
+
+##### `CreateHand`
+
+**Flujo:** Frontend → Gateway → Blackjack Service → _(internamente llama `Wallet.Hold`)_
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID",
+  "betAmountCents": "Number — apuesta inicial en centavos (> 0)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "handId": "String — identificador de la mano creada",
+  "subHands": [
+    {
+      "index": 0,
+      "cards": [{ "suit": "String", "rank": "String", "value": "Number" }],
+      "betAmountCents": "Number",
+      "status": "String — 'active'"
+    }
+  ],
+  "dealerVisibleCard": {
+    "suit": "String",
+    "rank": "String",
+    "value": "Number"
+  },
+  "status": "String — 'active'"
+}
+```
+
+> **Nota:** solo se devuelve la carta visible del dealer. La carta oculta
+> permanece con `hidden = true` en la base de datos y no se incluye en la
+> respuesta hasta que el estado general pase a `dealer_turn`.
+
+##### `PlayerAction`
+
+**Flujo:** Frontend → Gateway → Blackjack Service → _(puede llamar `Wallet.Hold` en double/split)_
+
+**Solicitud:**
+```json
+{
+  "handId": "String",
+  "userId": "UUID",
+  "subHandIndex": "Number — índice de la sub-mano sobre la que actúa",
+  "action": "String — 'hit' | 'stand' | 'double' | 'split' | 'surrender'"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "handId": "String",
+  "subHands": [
+    {
+      "index": "Number",
+      "cards": [{ "suit": "String", "rank": "String", "value": "Number" }],
+      "betAmountCents": "Number",
+      "status": "String",
+      "result": "String | null — solo cuando la sub-mano está resuelta"
+    }
+  ],
+  "dealerCards": [
+    {
+      "suit": "String",
+      "rank": "String",
+      "value": "Number",
+      "hidden": "Boolean — false si ya fue revelada"
+    }
+  ],
+  "status": "String — estado general de la mano",
+  "totalWinAmountCents": "Number | null — solo cuando status = 'settled'"
+}
+```
+
+##### `GetHandState`
+
+**Flujo:** Frontend → Gateway → Blackjack Service
+
+**Solicitud:**
+```json
+{
+  "handId": "String",
+  "userId": "UUID"
+}
+```
+
+**Respuesta:** misma estructura que la respuesta de `PlayerAction`.
+
+---
+
+#### 4.4 Poker Game Service
+
+Operaciones para gestionar mesas y jugar Póker. Es llamado por el **Gateway**
+(acciones del jugador vía HTTP y WebSocket) y llama internamente al
+**Wallet Service** y al **History Service**.
+
+##### `ListTables`
+
+**Flujo:** Frontend → Gateway → Poker Service
+
+**Solicitud:**
+```json
+{
+  "statusFilter": "String | null — 'waiting' | 'active' | null (todas)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "tables": [
+    {
+      "tableId": "String",
+      "name": "String",
+      "smallBlindCents": "Number",
+      "bigBlindCents": "Number",
+      "maxPlayers": "Number",
+      "currentPlayers": "Number — jugadores sentados actualmente",
+      "status": "String"
+    }
+  ]
+}
+```
+
+##### `CreateTable`
+
+**Flujo:** Frontend → Gateway → Poker Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID — usuario que crea la mesa",
+  "name": "String — nombre visible de la mesa",
+  "smallBlindCents": "Number — ciega pequeña en centavos",
+  "bigBlindCents": "Number — ciega grande en centavos",
+  "maxPlayers": "Number — máximo de jugadores (2..10)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "tableId": "String",
+  "name": "String",
+  "smallBlindCents": "Number",
+  "bigBlindCents": "Number",
+  "maxPlayers": "Number",
+  "status": "String — 'waiting'"
+}
+```
+
+##### `JoinTable`
+
+**Flujo:** Frontend → Gateway → Poker Service → _(internamente llama `Wallet.Hold` como buy-in)_
+
+**Solicitud:**
+```json
+{
+  "tableId": "String",
+  "userId": "UUID",
+  "buyInAmountCents": "Number — cantidad de fichas para comprar (> 0)",
+  "preferredSeat": "Number | null — asiento deseado (opcional, se asigna uno libre si no se indica)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "tableId": "String",
+  "seatPosition": "Number — asiento asignado",
+  "stackCents": "Number — fichas acreditadas en mesa",
+  "holdId": "UUID — referencia a la reserva del buy-in en Wallet"
+}
+```
+
+##### `LeaveTable`
+
+**Flujo:** Frontend → Gateway → Poker Service → _(internamente llama `Wallet.Settle`)_
+
+**Solicitud:**
+```json
+{
+  "tableId": "String",
+  "userId": "UUID"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "tableId": "String",
+  "finalStackCents": "Number — fichas que tenía al momento de salir",
+  "settledAmountCents": "Number — monto devuelto a la billetera"
+}
+```
+
+##### `PlayerAction`
+
+**Flujo:** Frontend → Gateway (WebSocket) → Poker Service
+
+**Solicitud:**
+```json
+{
+  "tableId": "String",
+  "roundId": "String",
+  "userId": "UUID",
+  "action": "String — 'fold' | 'check' | 'call' | 'raise' | 'all-in'",
+  "amountCents": "Number | null — monto del raise (requerido solo para 'raise')"
+}
+```
+
+**Respuesta (se envía a todos los jugadores de la mesa vía WebSocket):**
+```json
+{
+  "roundId": "String",
+  "stage": "String — etapa actual de la ronda",
+  "currentTurn": "Number — seatPosition del siguiente jugador que debe actuar",
+  "currentBetCents": "Number — apuesta actual a igualar",
+  "potSizeCents": "Number — bote total acumulado",
+  "communityCards": [{ "suit": "String", "rank": "String" }],
+  "players": [
+    {
+      "userId": "UUID",
+      "seatPosition": "Number",
+      "stackCents": "Number",
+      "totalBetInRoundCents": "Number",
+      "status": "String"
+    }
+  ],
+  "turnExpiresAt": "ISODate — tiempo límite para actuar",
+  "winners": "Array | null — solo cuando stage = 'settled' (ver estructura abajo)"
+}
+```
+
+**Estructura de `winners` (cuando la ronda finaliza):**
+```json
+[
+  {
+    "userId": "UUID",
+    "potType": "String — 'main' | 'side'",
+    "amountCents": "Number — centavos ganados"
+  }
+]
+```
+
+##### `GetTableState`
+
+**Flujo:** Frontend → Gateway → Poker Service
+
+**Solicitud:**
+```json
+{
+  "tableId": "String",
+  "userId": "UUID — se usa para determinar qué cartas privadas incluir"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "tableId": "String",
+  "name": "String",
+  "smallBlindCents": "Number",
+  "bigBlindCents": "Number",
+  "status": "String",
+  "seats": [
+    {
+      "seatPosition": "Number",
+      "userId": "UUID",
+      "stackCents": "Number",
+      "status": "String"
+    }
+  ],
+  "currentRound": {
+    "roundId": "String",
+    "stage": "String",
+    "communityCards": [{ "suit": "String", "rank": "String" }],
+    "yourHoleCards": [{ "suit": "String", "rank": "String" }],
+    "potSizeCents": "Number",
+    "currentBetCents": "Number",
+    "currentTurn": "Number",
+    "turnExpiresAt": "ISODate"
+  }
+}
+```
+
+> **Nota:** `yourHoleCards` contiene únicamente las cartas privadas del
+> usuario que realiza la consulta. Las cartas de los demás jugadores nunca
+> se envían hasta el `showdown`.
+
+---
+
+#### 4.5 History & Audit Service
+
+Operaciones para registrar y consultar eventos de juego. Recibe escrituras
+de los servicios de juego y expone lecturas al Gateway. Emite un stream de
+eventos al Stats Service.
+
+##### `RecordGameEvent`
+
+**Flujo:** Blackjack / Poker Service → History Service _(al finalizar una mano o acción relevante)_
+
+**Solicitud:**
+```json
+{
+  "eventId": "UUID — clave de idempotencia para evitar duplicados",
+  "userId": "UUID",
+  "gameType": "String — 'blackjack' | 'poker'",
+  "gameRefId": "String — hand._id (BJ) o rounds._id (Poker)",
+  "action": "String — 'hand_result' | 'bet_placed' | 'hand_cancelled' | 'table_result' | 'player_buyin' | 'player_payout' | 'player_eliminated'",
+  "details": "Object — contenido variable según gameType y action (ver sección 3.5 para ejemplos)",
+  "timestamp": "ISODate"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "recorded": "Boolean — true si se registró correctamente",
+  "eventId": "UUID — confirmación del evento registrado"
+}
+```
+
+##### `GetPlayerHistory`
+
+**Flujo:** Frontend → Gateway → History Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID",
+  "gameType": "String | null — filtrar por 'blackjack' o 'poker' (null = todos)",
+  "limit": "Number — cantidad máxima de eventos a devolver",
+  "offset": "Number — desplazamiento para paginación"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "events": [
+    {
+      "eventId": "UUID",
+      "gameType": "String",
+      "gameRefId": "String",
+      "action": "String",
+      "details": "Object",
+      "timestamp": "ISODate"
+    }
+  ],
+  "totalCount": "Number — total de eventos que coinciden con los filtros"
+}
+```
+
+---
+
+#### 4.6 Leaderboard & Stats Service
+
+Operaciones para consultar estadísticas y rankings. Recibe eventos del
+History Service mediante streaming continuo y expone datos agregados al
+Gateway.
+
+##### `StreamGameEvents` _(streaming continuo)_
+
+**Flujo:** History Service → Stats Service _(stream unidireccional: el History emite y el Stats consume)_
+
+**Cada evento del stream:**
+```json
+{
+  "eventId": "UUID",
+  "userId": "UUID",
+  "gameType": "String",
+  "action": "String",
+  "details": "Object",
+  "timestamp": "ISODate"
+}
+```
+
+El Stats Service procesa cada evento y actualiza incrementalmente
+`player_stats` y `player_game_stats`. No envía respuesta por evento
+individual (es un flujo de una sola dirección).
+
+##### `GetPlayerStats`
+
+**Flujo:** Frontend → Gateway → Stats Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "userId": "UUID",
+  "totalWageredCents": "Number",
+  "totalWonCents": "Number",
+  "netProfitCents": "Number",
+  "gamesPlayed": "Number",
+  "winRate": "Number — proporción 0.0 a 1.0",
+  "largestWinCents": "Number",
+  "currentStreak": "Number — positivo = victorias, negativo = derrotas",
+  "bestStreak": "Number",
+  "lastUpdated": "ISODate"
+}
+```
+
+##### `GetPlayerGameStats`
+
+**Flujo:** Frontend → Gateway → Stats Service
+
+**Solicitud:**
+```json
+{
+  "userId": "UUID",
+  "gameType": "String — 'blackjack' | 'poker'"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "userId": "UUID",
+  "gameType": "String",
+  "gamesPlayed": "Number",
+  "totalWageredCents": "Number",
+  "totalWonCents": "Number",
+  "largestWinCents": "Number",
+  "lastUpdated": "ISODate"
+}
+```
+
+##### `GetLeaderboard`
+
+**Flujo:** Frontend → Gateway → Stats Service
+
+**Solicitud:**
+```json
+{
+  "period": "String — 'daily' | 'weekly' | 'monthly' | 'all_time'",
+  "limit": "Number — cantidad de posiciones a devolver (ej. top 10)"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "period": "String",
+  "periodStart": "ISODate",
+  "entries": [
+    {
+      "rank": "Number",
+      "userId": "UUID",
+      "username": "String",
+      "scoreCents": "Number — netProfit del período",
+      "gamesPlayed": "Number"
+    }
+  ],
+  "computedAt": "ISODate"
+}
+```
+
+---
+
+#### 4.7 Mapa de Dependencias entre Servicios
+
+Resumen de quién llama a quién y con qué operaciones:
+
+| Origen | Destino | Operaciones |
+|---|---|---|
+| **API Gateway** | Auth & Users | `Register`, `Login`, `ValidateToken`, `RefreshToken`, `Logout`, `GetProfile` |
+| **API Gateway** | Wallet | `GetBalance`, `Deposit` |
+| **API Gateway** | Blackjack Game | `CreateHand`, `PlayerAction`, `GetHandState` |
+| **API Gateway** | Poker Game | `ListTables`, `CreateTable`, `JoinTable`, `LeaveTable`, `PlayerAction`, `GetTableState` |
+| **API Gateway** | History & Audit | `GetPlayerHistory` |
+| **API Gateway** | Leaderboard & Stats | `GetPlayerStats`, `GetPlayerGameStats`, `GetLeaderboard` |
+| **Auth & Users** | Wallet | `InitWallet` |
+| **Blackjack Game** | Wallet | `Hold`, `Settle`, `Release` |
+| **Blackjack Game** | History & Audit | `RecordGameEvent` |
+| **Poker Game** | Wallet | `Hold`, `Settle` |
+| **Poker Game** | History & Audit | `RecordGameEvent` |
+| **History & Audit** | Leaderboard & Stats | `StreamGameEvents` |
+
+---
+
+### 5. Resumen de Bases de Datos por Servicio
 
 | Servicio | Base de Datos | Motor | Recurso principal |
 |---|---|---|---|
