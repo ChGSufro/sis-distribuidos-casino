@@ -183,7 +183,7 @@ usuario más allá del `user_id` externo.
 | `wallet_id` | `UUID` | `NOT NULL REFERENCES wallets(id)` | Billetera dueña de la reserva |
 | `amount_cents` | `BIGINT` | `NOT NULL CHECK (amount_cents > 0)` | Monto reservado en centavos |
 | `game_type` | `VARCHAR(20)` | `NOT NULL` | Tipo de juego: `blackjack` o `poker` |
-| `game_ref_id` | `UUID` | `NOT NULL` | Referencia externa a la mano (BJ) o sesión (Poker) |
+| `game_ref_id` | `VARCHAR(64)` | `NOT NULL` | Referencia externa al juego, como ObjectId hex: `hands._id` en Blackjack, `tables._id` en Póker |
 | `status` | `VARCHAR(20)` | `NOT NULL DEFAULT 'active'` | `active`, `settled`, `released` |
 | `idempotency_key` | `VARCHAR(64)` | `UNIQUE NOT NULL` | Clave de idempotencia enviada por el servicio de juego |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` | Fecha de creación de la reserva |
@@ -210,7 +210,7 @@ usuario más allá del `user_id` externo.
    se crea un `hold` con `status = 'active'` y una `transaction` de tipo `hold`
    que descuenta el saldo.
 2. Al finalizar la mano, el Blackjack Service llama
-   `Settle(holdId, winAmount)` → el `hold` pasa a `status = 'settled'` y se
+   `Settle(holdId, winAmountCents)` → el `hold` pasa a `status = 'settled'` y se
    registra una `transaction` de tipo `settle` abonando el monto ganado.
 3. Si la mano se cancela, se llama `Release(holdId)` → el `hold` pasa a
    `status = 'released'` y se registra una `transaction` de tipo `release`
@@ -237,7 +237,7 @@ Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
       "cards": [
         { "suit": "H | D | C | S", "rank": "2..10 | J | Q | K | A", "value": "Number (1..11)" }
       ],
-      "betAmount": "Number (centavos apostados en esta sub-mano; se duplica en double down)",
+      "betAmountCents": "Number (centavos apostados en esta sub-mano; se duplica en double down)",
       "holdId": "UUID (hold en Wallet Service asociado a esta sub-mano)",
       "status": "active | stand | bust | blackjack | doubled | settled | cancelled",
       "result": "win | lose | push | blackjack_win | surrender | null (si no ha terminado)"
@@ -259,7 +259,7 @@ Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
     }
   ],
   "status": "active | dealer_turn | settled | cancelled",
-  "totalWinAmount": "Number | null (centavos totales ganados sumando todas las sub-manos)",
+  "totalWinAmountCents": "Number | null (centavos totales ganados sumando todas las sub-manos)",
   "idempotencyKey": "String (clave única para operaciones con Wallet y History)",
   "createdAt": "ISODate",
   "settledAt": "ISODate | null"
@@ -273,28 +273,28 @@ Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
 - `{ idempotencyKey: 1 }` (único) — prevención de duplicados.
 
 **Ciclo de vida de una mano:**
-1. El jugador envía `CreateHand(betAmount)` → se crea el documento con una
+1. El jugador envía `CreateHand(betAmountCents)` → se crea el documento con una
    sub-mano inicial (`subHands[0]`, `index = 0`), `status = 'active'`. El
    servicio invoca `Wallet.Hold` y almacena el `holdId` en `subHands[0].holdId`.
 2. El jugador envía acciones sobre la sub-mano correspondiente:
    - `hit` → se agrega una carta a `subHands[i].cards`.
    - `stand` → `subHands[i].status = 'stand'`.
    - `double` → se invoca un nuevo `Wallet.Hold` por el monto adicional, se
-     duplica `subHands[i].betAmount`, se agrega exactamente una carta y la
+     duplica `subHands[i].betAmountCents`, se agrega exactamente una carta y la
      sub-mano queda en `stand` o `bust`.
    - `split` → la sub-mano actual se divide: se crea una nueva sub-mano
      (`index = N+1`) con una de las dos cartas del par. Se invoca un nuevo
      `Wallet.Hold` para la nueva sub-mano. Cada sub-mano recibe una carta
      adicional y continúa de forma independiente.
    - `surrender` → `subHands[i].result = 'surrender'`. Se invoca
-     `Wallet.Settle(holdId, betAmount/2)` devolviendo la mitad de la apuesta.
+     `Wallet.Settle(holdId, betAmountCents/2)` devolviendo la mitad de la apuesta.
 3. Cuando todas las sub-manos están resueltas (`stand`, `bust`, `blackjack`
    o `surrender`), el estado general pasa a `status = 'dealer_turn'`. Se
    revelan las cartas ocultas del dealer (`hidden = false`) y el dealer juega
    según las reglas de la casa.
 4. Se determina `result` para cada sub-mano comparando con el dealer. El
    servicio invoca `Wallet.Settle` o `Wallet.Release` por cada sub-mano según
-   corresponda, calcula `totalWinAmount`, luego invoca
+   corresponda, calcula `totalWinAmountCents`, luego invoca
    `History.RecordHandAudit`. Finalmente `status = 'settled'` (o `'cancelled'`).
 
 ---
@@ -319,15 +319,15 @@ y sus fichas acumuladas viven aquí y sobreviven entre rondas.
 {
   "_id": "ObjectId",
   "name": "String (nombre visible de la mesa, ej. 'Mesa #1')",
-  "smallBlind": "Number (centavos, > 0)",
-  "bigBlind": "Number (centavos, > 0)",
+  "smallBlindCents": "Number (centavos, > 0)",
+  "bigBlindCents": "Number (centavos, > 0)",
   "maxPlayers": "Number (2..10)",
   "status": "waiting | active | closed",
   "seats": [
     {
       "seatPosition": "Number (0..maxPlayers-1)",
       "userId": "UUID (referencia externa al Auth Service)",
-      "stack": "Number (fichas disponibles en mesa, centavos)",
+      "stackCents": "Number (fichas disponibles en mesa, centavos)",
       "holdId": "UUID (referencia al hold del buy-in en Wallet Service)",
       "status": "active | sitting_out | left"
     }
@@ -355,31 +355,31 @@ comunitarias, los botes, las acciones y los ganadores.
       "holeCards": [
         { "suit": "H | D | C | S", "rank": "2..10 | J | Q | K | A" }
       ],
-      "stackAtStart": "Number (fichas del jugador al inicio de la ronda)",
-      "totalBetInRound": "Number (total apostado por este jugador en la ronda)",
+      "stackAtStartCents": "Number (fichas del jugador al inicio de la ronda)",
+      "totalBetInRoundCents": "Number (total apostado por este jugador en la ronda)",
       "status": "active | folded | all-in | eliminated"
     }
   ],
   "communityCards": [
     { "suit": "H | D | C | S", "rank": "2..10 | J | Q | K | A" }
   ],
-  "potSize": "Number (centavos acumulados en el bote principal)",
+  "potSizeCents": "Number (centavos acumulados en el bote principal)",
   "sidePots": [
     {
-      "amount": "Number (centavos del bote secundario)",
+      "amountCents": "Number (centavos del bote secundario)",
       "eligiblePlayers": ["UUID (userId de jugadores elegibles)"]
     }
   ],
   "dealerPosition": "Number (seatPosition del dealer)",
   "currentTurn": "Number (seatPosition del jugador que debe actuar)",
-  "currentBet": "Number (apuesta actual a igualar en la ronda de apuestas vigente)",
+  "currentBetCents": "Number (apuesta actual a igualar en la ronda de apuestas vigente)",
   "turnExpiresAt": "ISODate (tiempo límite para que el jugador actual actúe; auto-fold al expirar)",
   "stage": "preflop | flop | turn | river | showdown | settled",
   "actions": [
     {
       "userId": "UUID",
       "action": "fold | check | call | raise | all-in",
-      "amount": "Number (centavos apostados, 0 para fold/check)",
+      "amountCents": "Number (centavos apostados, 0 para fold/check)",
       "timestamp": "ISODate"
     }
   ],
@@ -387,7 +387,7 @@ comunitarias, los botes, las acciones y los ganadores.
     {
       "userId": "UUID",
       "potType": "main | side",
-      "amount": "Number (centavos ganados)"
+      "amountCents": "Number (centavos ganados)"
     }
   ],
   "createdAt": "ISODate",
@@ -407,13 +407,13 @@ comunitarias, los botes, las acciones y los ganadores.
 **Ciclo de vida de una mesa y sus rondas:**
 1. Un jugador crea o se une a una mesa. Al sentarse invoca `Wallet.Hold` como
    buy-in; el `holdId` se almacena en `seats[].holdId` de la mesa y las fichas
-   se acreditan en `seats[].stack`.
+   se acreditan en `seats[].stackCents`.
 2. Cuando hay suficientes jugadores activos, se crea un documento en `rounds`
    con `roundNumber` secuencial. Se reparten `holeCards` a cada jugador,
    `stage = 'preflop'`. La mesa actualiza `currentRoundId`.
 3. La ronda avanza por `preflop → flop → turn → river → showdown`. En cada
-   etapa se registran las acciones en `actions[]`, se actualizan `potSize`,
-   `sidePots`, `currentBet` y `currentTurn`. Si `turnExpiresAt` expira sin
+etapa se registran las acciones en `actions[]`, se actualizan `potSizeCents`,
+    `sidePots`, `currentBetCents` y `currentTurn`. Si `turnExpiresAt` expira sin
    acción, el sistema ejecuta auto-fold para el jugador.
 4. En `showdown` se evalúan las mejores manos combinando `holeCards` +
    `communityCards`. Los ganadores se registran en `winners[]`. Los stacks
@@ -456,9 +456,9 @@ Stats Service vía gRPC.
 `hand_result` (Blackjack):
 ```json
 {
-  "betAmount": 1000,
+  "betAmountCents": 1000,
   "result": "win",
-  "winAmount": 2000,
+  "winAmountCents": 2000,
   "playerCards": [{ "suit": "H", "rank": "A" }, { "suit": "S", "rank": "K" }],
   "dealerCards": [{ "suit": "D", "rank": "7" }, { "suit": "C", "rank": "Q" }]
 }
@@ -467,7 +467,7 @@ Stats Service vía gRPC.
 `bet_placed` (Blackjack):
 ```json
 {
-  "betAmount": 500,
+  "betAmountCents": 500,
   "handId": "UUID de la mano"
 }
 ```
@@ -476,7 +476,7 @@ Stats Service vía gRPC.
 ```json
 {
   "reason": "player_disconnected | timeout",
-  "betAmount": 1000
+  "betAmountCents": 1000
 }
 ```
 
@@ -485,11 +485,11 @@ Stats Service vía gRPC.
 {
   "finalStage": "showdown",
   "yourResult": "win",
-  "winAmount": 3500,
+  "winAmountCents": 3500,
   "communityCards": [{ "suit": "H", "rank": "A" }, { "suit": "H", "rank": "K" }, { "suit": "H", "rank": "Q" }, { "suit": "H", "rank": "J" }, { "suit": "H", "rank": "10" }],
   "yourHand": [{ "suit": "S", "rank": "A" }, { "suit": "D", "rank": "A" }],
   "playerCount": 5,
-  "potSize": 12000
+  "potSizeCents": 12000
 }
 ```
 
@@ -497,7 +497,7 @@ Stats Service vía gRPC.
 ```json
 {
   "tableId": "ObjectId de la mesa",
-  "amount": 5000,
+  "amountCents": 5000,
   "holdId": "UUID del hold en Wallet"
 }
 ```
@@ -526,12 +526,12 @@ de manos o mesas.
 {
   "_id": "ObjectId",
   "userId": "UUID (referencia externa al Auth Service)",
-  "totalWagered": "Number (centavos totales apostados)",
-  "totalWon": "Number (centavos totales ganados)",
-  "netProfit": "Number (totalWon - totalWagered, calculado)",
+  "totalWageredCents": "Number (centavos totales apostados)",
+  "totalWonCents": "Number (centavos totales ganados)",
+  "netProfitCents": "Number (totalWonCents - totalWageredCents, calculado)",
   "gamesPlayed": "Number (total de manos o sesiones completadas)",
   "winRate": "Number (proporción de victorias, 0.0..1.0)",
-  "largestWin": "Number (mayor ganancia individual en centavos)",
+  "largestWinCents": "Number (mayor ganancia individual en centavos)",
   "currentStreak": "Number (racha actual: positivo = victorias, negativo = derrotas)",
   "bestStreak": "Number (mejor racha histórica de victorias)",
   "lastUpdated": "ISODate"
@@ -546,9 +546,9 @@ de manos o mesas.
   "userId": "UUID",
   "gameType": "blackjack | poker",
   "gamesPlayed": "Number",
-  "totalWagered": "Number (centavos)",
-  "totalWon": "Number (centavos)",
-  "largestWin": "Number (centavos)",
+  "totalWageredCents": "Number (centavos)",
+  "totalWonCents": "Number (centavos)",
+  "largestWinCents": "Number (centavos)",
   "lastUpdated": "ISODate"
 }
 ```
@@ -564,7 +564,7 @@ de manos o mesas.
     {
       "userId": "UUID",
       "rank": "Number (posición 1..N)",
-      "score": "Number (netProfit del período)",
+      "scoreCents": "Number (netProfit del período)",
       "gamesPlayed": "Number"
     }
   ],
@@ -583,7 +583,7 @@ de manos o mesas.
    `player_game_stats` para cada evento recibido (nunca consulta
    `audit_history_db` directamente).
 3. Periódicamente (cada hora/día/semana/mes) se calculan snapshots de
-   `rankings` ordenando por `netProfit` descendente.
+   `rankings` ordenando por `netProfitCents` descendente.
 
 ---
 
