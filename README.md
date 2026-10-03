@@ -84,16 +84,16 @@ flowchart TB
     %% ==========================================
     Gateway -->|gRPC: Auth / Sesión| AuthSvc
     Gateway -->|gRPC: Operaciones Saldo| WalletSvc
-    Gateway -->|gRPC / WS: Blackjack| BJGameSvc
-    Gateway -->|gRPC / WS: Poker| PokerGameSvc
+    Gateway -->|gRPC: Blackjack Stream| BJGameSvc
+    Gateway -->|gRPC: Poker Stream| PokerGameSvc
     Gateway -->|gRPC: Consultar Historial| HistorySvc
     Gateway -->|gRPC: Consultar Rankings| StatsSvc
 
     %% ==========================================
     %% COMUNICACIÓN INTER-SERVICIOS
     %% ==========================================
-    BJGameSvc -->|gRPC: Hold / Settle Bets| WalletSvc
-    PokerGameSvc -->|gRPC: Hold / Settle (Buy-In / Payout)| WalletSvc
+    BJGameSvc -->|gRPC: Hold / Settle / Release| WalletSvc
+    PokerGameSvc -->|gRPC: Hold / Settle| WalletSvc
 
     BJGameSvc -->|gRPC: RecordGameEvent| HistorySvc
     PokerGameSvc -->|gRPC: RecordGameEvent| HistorySvc
