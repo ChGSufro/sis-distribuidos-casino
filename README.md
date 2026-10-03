@@ -93,10 +93,10 @@ flowchart TB
     %% COMUNICACIÓN INTER-SERVICIOS
     %% ==========================================
     BJGameSvc -->|gRPC: Hold / Settle Bets| WalletSvc
-    PokerGameSvc -->|gRPC: BuyIn / Payout| WalletSvc
+    PokerGameSvc -->|gRPC: Hold / Settle (Buy-In / Payout)| WalletSvc
 
-    BJGameSvc -->|gRPC: RecordHandAudit| HistorySvc
-    PokerGameSvc -->|gRPC: RecordTableAudit| HistorySvc
+    BJGameSvc -->|gRPC: RecordGameEvent| HistorySvc
+    PokerGameSvc -->|gRPC: RecordGameEvent| HistorySvc
 
     %% ==========================================
     %% ESTILOS VISUALES
@@ -223,7 +223,7 @@ usuario más allá del `user_id` externo.
 **Responsabilidad única:** gestión del estado de manos de Blackjack (cartas,
 decisiones del jugador, resultado). No almacena créditos ni datos de usuario
 más allá del `userId` externo. Al iniciar y finalizar una mano invoca al Wallet
-Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
+Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordGameEvent`).
 
 ##### Colección: `hands`
 
@@ -295,7 +295,7 @@ Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
 4. Se determina `result` para cada sub-mano comparando con el dealer. El
    servicio invoca `Wallet.Settle` o `Wallet.Release` por cada sub-mano según
    corresponda, calcula `totalWinAmountCents`, luego invoca
-   `History.RecordHandAudit`. Finalmente `status = 'settled'` (o `'cancelled'`).
+   `History.RecordGameEvent`. Finalmente `status = 'settled'` (o `'cancelled'`).
 
 ---
 
@@ -303,8 +303,8 @@ Service (`Hold`/`Settle`/`Release`) y al History Service (`RecordHandAudit`).
 
 **Responsabilidad única:** gestión de mesas de Póker (jugadores, posiciones,
 cartas comunitarias, pozos, turnos, ciegas). No administra créditos
-directamente: invoca al Wallet Service para `BuyIn`/`Payout`. No conoce
-historial de auditoría: invoca `History.RecordTableAudit`.
+directamente: invoca al Wallet Service (`Hold`/`Settle`) para el buy-in y payout. No conoce
+historial de auditoría: invoca `History.RecordGameEvent`.
 
 El modelo separa la **mesa persistente** (`tables`) de cada **ronda/mano
 individual** (`rounds`). Una mesa puede albergar decenas de rondas sucesivas;
@@ -419,7 +419,7 @@ etapa se registran las acciones en `actions[]`, se actualizan `potSizeCents`,
    `communityCards`. Los ganadores se registran en `winners[]`. Los stacks
    en `tables.seats[]` se actualizan (ganadores aumentan, perdedores
    disminuyen). `stage → 'settled'`, `settledAt = NOW()`.
-5. Al finalizar la ronda, el servicio invoca `History.RecordTableAudit` con
+5. Al finalizar la ronda, el servicio invoca `History.RecordGameEvent` con
    el resumen. Se puede iniciar una nueva ronda repitiendo desde el paso 2.
 6. Cuando un jugador abandona la mesa, el servicio invoca
    `Wallet.Settle(holdId, remainingStack)` para devolver su stack restante
@@ -431,7 +431,7 @@ etapa se registran las acciones en `actions[]`, se actualizan `potSizeCents`,
 
 **Responsabilidad única:** registro inmutable de eventos de juego. Solo
 escritura (_append-only_). Recibe eventos de los servicios de juego
-(`RecordHandAudit` y `RecordTableAudit`) y transmite un stream de eventos al
+(`RecordGameEvent`) y transmite un stream de eventos al
 Stats Service vía gRPC.
 
 ##### Colección: `game_events`
@@ -468,7 +468,7 @@ Stats Service vía gRPC.
 ```json
 {
   "betAmountCents": 500,
-  "handId": "UUID de la mano"
+  "handId": "String (ObjectId hex de la mano)"
 }
 ```
 
@@ -811,7 +811,7 @@ Operaciones para gestionar créditos virtuales. Es llamado por el **Gateway**
   "userId": "UUID",
   "amountCents": "Number — monto a reservar (> 0)",
   "gameType": "String — 'blackjack' | 'poker'",
-  "gameRefId": "UUID — referencia a la mano (BJ) o mesa (Poker)",
+  "gameRefId": "String — referencia al ObjectId de la mano (BJ) o mesa (Poker)",
   "idempotencyKey": "String — clave única para evitar reservas duplicadas"
 }
 ```

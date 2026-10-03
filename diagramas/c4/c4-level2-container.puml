@@ -57,11 +57,11 @@ Rel(auth_svc, wallet_svc, "InitWallet al registrar usuario", "gRPC")
 
 ' Relaciones: Juegos -> Wallet (apuestas)
 Rel(bj_svc, wallet_svc, "Hold/Settle Bets", "gRPC")
-Rel(poker_svc, wallet_svc, "BuyIn/Payout", "gRPC")
+Rel(poker_svc, wallet_svc, "Hold/Settle (BuyIn/Payout)", "gRPC")
 
 ' Relaciones: Juegos -> History (auditoria)
-Rel(bj_svc, history_svc, "RecordHandAudit", "gRPC")
-Rel(poker_svc, history_svc, "RecordTableAudit", "gRPC")
+Rel(bj_svc, history_svc, "RecordGameEvent", "gRPC")
+Rel(poker_svc, history_svc, "RecordGameEvent", "gRPC")
 
 ' Relaciones: History -> Stats (eventos)
 Rel(history_svc, stats_svc, "Stream de Eventos", "gRPC")
