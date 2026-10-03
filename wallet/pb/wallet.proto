@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package wallet;
+
+option go_package = "github.com/ChGSufro/sis-distribuidos-casino/wallet/pb";
+
+// ─────────────────────────────────────────────────────────
+// Mensajes de Solicitud y Respuesta
+// ─────────────────────────────────────────────────────────
+
+// Inicialización de billetera para nuevo usuario
+message InitWalletRequest {
+  string user_id = 1;
+}
+
+message InitWalletResponse {
+  string wallet_id     = 1;
+  int64  balance_cents = 2;
+}
+
+// Consulta de saldo
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message GetBalanceResponse {
+  string user_id       = 1;
+  int64  balance_cents = 2;
+  string updated_at    = 3; // Formato ISO 8601
+}
+
+// Depósito de fondos
+message DepositRequest {
+  string user_id      = 1;
+  int64  amount_cents = 2;
+}
+
+message DepositResponse {
+  string transaction_id    = 1;
+  int64  new_balance_cents = 2;
+}
+
+// Reserva de fondos para iniciar o continuar apuestas
+message HoldRequest {
+  string user_id         = 1;
+  int64  amount_cents    = 2;
+  string game_type       = 3; // "blackjack" | "poker"
+  string game_ref_id     = 4; // ObjectId hex de la mano o mesa
+  string idempotency_key = 5;
+}
+
+message HoldResponse {
+  string hold_id      = 1;
+  int64  amount_cents = 2;
+  string status       = 3; // "active"
+}
+
+// Liquidación de reserva tras resolver la partida
+message SettleRequest {
+  string hold_id          = 1;
+  int64  win_amount_cents = 2; // Monto ganado (0 si perdió todo)
+}
+
+message SettleResponse {
+  string hold_id           = 1;
+  string status            = 2; // "settled"
+  string transaction_id    = 3;
+  int64  new_balance_cents = 4;
+}
+
+// Liberación/cancelación de reserva devolviendo el saldo original
+message ReleaseRequest {
+  string hold_id = 1;
+}
+
+message ReleaseResponse {
+  string hold_id           = 1;
+  string status            = 2; // "released"
+  string transaction_id    = 3;
+  int64  new_balance_cents = 4;
+}
+
+// ─────────────────────────────────────────────────────────
+// Definición del Servicio gRPC
+// ─────────────────────────────────────────────────────────
+
+service WalletService {
+  rpc InitWallet (InitWalletRequest) returns (InitWalletResponse);
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
+  rpc Deposit    (DepositRequest)    returns (DepositResponse);
+  rpc Hold       (HoldRequest)       returns (HoldResponse);
+  rpc Settle     (SettleRequest)     returns (SettleResponse);
+  rpc Release    (ReleaseRequest)    returns (ReleaseResponse);
+}

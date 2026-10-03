@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package blackjack;
+
+option go_package = "github.com/ChGSufro/sis-distribuidos-casino/blackjack/pb";
+
+// ─────────────────────────────────────────────────────────
+// Entidades del Dominio
+// ─────────────────────────────────────────────────────────
+
+message Card {
+  string suit   = 1; // "H" (Corazones), "D" (Diamantes), "C" (Tréboles), "S" (Picas)
+  string rank   = 2; // "2".."10", "J", "Q", "K", "A"
+  int32  value  = 3; // Valor numérico principal (1..11)
+  bool   hidden = 4; // True si la carta está oculta (dealer)
+}
+
+message SubHand {
+  int32         index            = 1; // 0 para mano principal, 1+ para split
+  repeated Card cards            = 2;
+  int64         bet_amount_cents = 3;
+  string        status           = 4; // "active", "stand", "bust", "blackjack", "doubled", "settled"
+  string        result           = 5; // "win", "lose", "push", "blackjack_win", "surrender"
+}
+
+// ─────────────────────────────────────────────────────────
+// Mensajes de Solicitud y Respuesta
+// ─────────────────────────────────────────────────────────
+
+message CreateHandRequest {
+  string user_id          = 1;
+  int64  bet_amount_cents = 2;
+}
+
+message CreateHandResponse {
+  string          hand_id             = 1;
+  repeated SubHand sub_hands          = 2;
+  Card            dealer_visible_card = 3;
+  string          status              = 4; // "active"
+}
+
+message PlayerActionRequest {
+  string hand_id        = 1;
+  string user_id        = 2;
+  int32  sub_hand_index = 3;
+  string action         = 4; // "hit", "stand", "double", "split", "surrender"
+}
+
+message PlayerActionResponse {
+  string          hand_id                = 1;
+  repeated SubHand sub_hands             = 2;
+  repeated Card   dealer_cards           = 3;
+  string          status                 = 4; // "active", "dealer_turn", "settled", "cancelled"
+  int64           total_win_amount_cents = 5; // Ganancia final calculada
+}
+
+message GetHandStateRequest {
+  string hand_id = 1;
+  string user_id = 2;
+}
+
+message GetHandStateResponse {
+  string          hand_id                = 1;
+  repeated SubHand sub_hands             = 2;
+  repeated Card   dealer_cards           = 3;
+  string          status                 = 4;
+  int64           total_win_amount_cents = 5;
+}
+
+// ─────────────────────────────────────────────────────────
+// Definición del Servicio gRPC
+// ─────────────────────────────────────────────────────────
+
+service BlackjackService {
+  rpc CreateHand   (CreateHandRequest)   returns (CreateHandResponse);
+  rpc PlayerAction (PlayerActionRequest) returns (PlayerActionResponse);
+  rpc GetHandState (GetHandStateRequest) returns (GetHandStateResponse);
+}
