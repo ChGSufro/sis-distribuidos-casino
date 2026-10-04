@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package history;
+
+option go_package = "github.com/ChGSufro/sis-distribuidos-casino/history/pb";
+
+// ─────────────────────────────────────────────────────────
+// Entidades del Dominio
+// ─────────────────────────────────────────────────────────
+
+// Evento de juego registrado en el historial del jugador
+message GameEvent {
+  string event_id    = 1; // UUID del evento
+  string user_id     = 2; // Identificador del jugador
+  string game_type   = 3; // "blackjack" | "poker"
+  string game_ref_id = 4; // ObjectId hex de la mano o mesa
+  string action      = 5; // "hand_result" | "bet_placed" | "hand_cancelled" |
+                          // "table_result" | "player_buyin" | "player_payout" |
+                          // "player_eliminated"
+  string details     = 6; // JSON con el contenido variable segun la accion
+  string timestamp   = 7; // Formato ISO 8601
+}
+
+// ─────────────────────────────────────────────────────────
+// Mensajes de Solicitud y Respuesta
+// ─────────────────────────────────────────────────────────
+
+// Registro de un evento de juego
+message RecordGameEventRequest {
+  GameEvent event = 1;
+}
+
+message RecordGameEventResponse {
+  string event_id    = 1;
+  string status      = 2; // "recorded"
+  string recorded_at = 3; // Formato ISO 8601
+}
+
+// Consulta del historial de un jugador
+message GetPlayerHistoryRequest {
+  string user_id   = 1;
+  string game_type = 2; // Vacio = todos los juegos
+  int32  limit     = 3;
+  int32  offset    = 4;
+}
+
+message GetPlayerHistoryResponse {
+  repeated GameEvent events      = 1;
+  int32              total_count = 2;
+}
+
+// ─────────────────────────────────────────────────────────
+// Definición del Servicio gRPC
+// ─────────────────────────────────────────────────────────
+
+service HistoryService {
+  rpc RecordGameEvent  (RecordGameEventRequest)  returns (RecordGameEventResponse);
+  rpc GetPlayerHistory (GetPlayerHistoryRequest) returns (GetPlayerHistoryResponse);
+}
