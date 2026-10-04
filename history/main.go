@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net"
-	"time"
 
 	pb "github.com/ChGSufro/sis-distribuidos-casino/history/pb"
 	"google.golang.org/grpc"
@@ -16,11 +15,10 @@ type server struct {
 
 // RecordGameEvent: registro simulado de un evento de juego
 func (s *server) RecordGameEvent(ctx context.Context, req *pb.RecordGameEventRequest) (*pb.RecordGameEventResponse, error) {
-	log.Printf("RecordGameEvent recibido para user_id: %s, juego: %s, accion: %s", req.GetEvent().GetUserId(), req.GetEvent().GetGameType(), req.GetEvent().GetAction())
+	log.Printf("RecordGameEvent recibido para user_id: %s, juego: %s, accion: %s", req.GetUserId(), req.GetGameType(), req.GetAction())
 	return &pb.RecordGameEventResponse{
-		EventId:    req.GetEvent().GetEventId(),
-		Status:     "recorded",
-		RecordedAt: time.Now().Format(time.RFC3339),
+		Recorded: true,
+		EventId:  req.GetEventId(),
 	}, nil
 }
 

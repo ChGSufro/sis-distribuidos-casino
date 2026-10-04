@@ -27,13 +27,18 @@ message GameEvent {
 
 // Registro de un evento de juego
 message RecordGameEventRequest {
-  GameEvent event = 1;
+  string event_id    = 1; // UUID — clave de idempotencia para evitar duplicados
+  string user_id     = 2;
+  string game_type   = 3; // "blackjack" | "poker"
+  string game_ref_id = 4; // ObjectId hex de la mano o mesa
+  string action      = 5; // Mismo enum de acciones descrito en GameEvent
+  string details     = 6; // JSON con el contenido variable segun la accion
+  string timestamp   = 7; // Formato ISO 8601
 }
 
 message RecordGameEventResponse {
-  string event_id    = 1;
-  string status      = 2; // "recorded"
-  string recorded_at = 3; // Formato ISO 8601
+  bool   recorded = 1; // true si se registró correctamente
+  string event_id = 2; // Confirmación del evento registrado
 }
 
 // Consulta del historial de un jugador

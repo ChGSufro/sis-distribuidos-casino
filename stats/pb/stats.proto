@@ -10,40 +10,14 @@ option go_package = "github.com/ChGSufro/sis-distribuidos-casino/stats/pb";
 
 // Evento de juego emitido por History Service
 message GameEvent {
-  string event_id    = 1; // UUID del evento
-  string user_id     = 2; // Identificador del jugador
-  string game_type   = 3; // "blackjack" | "poker"
-  string game_ref_id = 4; // ObjectId hex de la mano o mesa
-  string action      = 5; // "hand_result" | "bet_placed" | "hand_cancelled" |
-                          // "table_result" | "player_buyin" | "player_payout" |
-                          // "player_eliminated"
-  string details     = 6; // JSON con el contenido variable segun la accion
-  string timestamp   = 7; // Formato ISO 8601
-}
-
-// Estadísticas generales de un jugador
-message PlayerStats {
-  string user_id             = 1;
-  int64  total_wagered_cents = 2;
-  int64  total_won_cents     = 3;
-  int64  net_profit_cents    = 4;
-  int32  games_played        = 5;
-  double win_rate            = 6; // 0.0 - 1.0
-  int64  largest_win_cents   = 7;
-  int32  current_streak      = 8;
-  int32  best_streak         = 9;
-  string last_updated        = 10; // Formato ISO 8601
-}
-
-// Estadísticas de un jugador para un juego específico
-message GameStats {
-  string user_id             = 1;
-  string game_type           = 2; // "blackjack" | "poker"
-  int32  games_played        = 3;
-  int64  total_wagered_cents = 4;
-  int64  total_won_cents     = 5;
-  int64  largest_win_cents   = 6;
-  string last_updated        = 7; // Formato ISO 8601
+  string event_id  = 1; // UUID del evento
+  string user_id   = 2; // Identificador del jugador
+  string game_type = 3; // "blackjack" | "poker"
+  string action    = 4; // "hand_result" | "bet_placed" | "hand_cancelled" |
+                        // "table_result" | "player_buyin" | "player_payout" |
+                        // "player_eliminated"
+  string details   = 5; // JSON con el contenido variable segun la accion
+  string timestamp = 6; // Formato ISO 8601
 }
 
 // Entrada del ranking de un jugador
@@ -70,7 +44,16 @@ message GetPlayerStatsRequest {
 }
 
 message GetPlayerStatsResponse {
-  PlayerStats stats = 1;
+  string user_id             = 1;
+  int64  total_wagered_cents = 2;
+  int64  total_won_cents     = 3;
+  int64  net_profit_cents    = 4;
+  int32  games_played        = 5;
+  double win_rate            = 6; // 0.0 - 1.0
+  int64  largest_win_cents   = 7;
+  int32  current_streak      = 8; // positivo = victorias, negativo = derrotas
+  int32  best_streak         = 9;
+  string last_updated        = 10; // Formato ISO 8601
 }
 
 message GetPlayerGameStatsRequest {
@@ -79,7 +62,13 @@ message GetPlayerGameStatsRequest {
 }
 
 message GetPlayerGameStatsResponse {
-  GameStats stats = 1;
+  string user_id             = 1;
+  string game_type           = 2; // "blackjack" | "poker"
+  int32  games_played        = 3;
+  int64  total_wagered_cents = 4;
+  int64  total_won_cents     = 5;
+  int64  largest_win_cents   = 6;
+  string last_updated        = 7; // Formato ISO 8601
 }
 
 message GetLeaderboardRequest {

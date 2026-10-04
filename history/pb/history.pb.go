@@ -119,7 +119,13 @@ func (x *GameEvent) GetTimestamp() string {
 // Registro de un evento de juego
 type RecordGameEventRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Event         *GameEvent             `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"` // UUID — clave de idempotencia para evitar duplicados
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	GameType      string                 `protobuf:"bytes,3,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"`      // "blackjack" | "poker"
+	GameRefId     string                 `protobuf:"bytes,4,opt,name=game_ref_id,json=gameRefId,proto3" json:"game_ref_id,omitempty"` // ObjectId hex de la mano o mesa
+	Action        string                 `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`                          // Mismo enum de acciones descrito en GameEvent
+	Details       string                 `protobuf:"bytes,6,opt,name=details,proto3" json:"details,omitempty"`                        // JSON con el contenido variable segun la accion
+	Timestamp     string                 `protobuf:"bytes,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                    // Formato ISO 8601
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -154,18 +160,59 @@ func (*RecordGameEventRequest) Descriptor() ([]byte, []int) {
 	return file_pb_history_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RecordGameEventRequest) GetEvent() *GameEvent {
+func (x *RecordGameEventRequest) GetEventId() string {
 	if x != nil {
-		return x.Event
+		return x.EventId
 	}
-	return nil
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetGameType() string {
+	if x != nil {
+		return x.GameType
+	}
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetGameRefId() string {
+	if x != nil {
+		return x.GameRefId
+	}
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetDetails() string {
+	if x != nil {
+		return x.Details
+	}
+	return ""
+}
+
+func (x *RecordGameEventRequest) GetTimestamp() string {
+	if x != nil {
+		return x.Timestamp
+	}
+	return ""
 }
 
 type RecordGameEventResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                           // "recorded"
-	RecordedAt    string                 `protobuf:"bytes,3,opt,name=recorded_at,json=recordedAt,proto3" json:"recorded_at,omitempty"` // Formato ISO 8601
+	Recorded      bool                   `protobuf:"varint,1,opt,name=recorded,proto3" json:"recorded,omitempty"`             // true si se registró correctamente
+	EventId       string                 `protobuf:"bytes,2,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"` // Confirmación del evento registrado
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,23 +247,16 @@ func (*RecordGameEventResponse) Descriptor() ([]byte, []int) {
 	return file_pb_history_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *RecordGameEventResponse) GetRecorded() bool {
+	if x != nil {
+		return x.Recorded
+	}
+	return false
+}
+
 func (x *RecordGameEventResponse) GetEventId() string {
 	if x != nil {
 		return x.EventId
-	}
-	return ""
-}
-
-func (x *RecordGameEventResponse) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *RecordGameEventResponse) GetRecordedAt() string {
-	if x != nil {
-		return x.RecordedAt
 	}
 	return ""
 }
@@ -354,14 +394,18 @@ const file_pb_history_proto_rawDesc = "" +
 	"\vgame_ref_id\x18\x04 \x01(\tR\tgameRefId\x12\x16\n" +
 	"\x06action\x18\x05 \x01(\tR\x06action\x12\x18\n" +
 	"\adetails\x18\x06 \x01(\tR\adetails\x12\x1c\n" +
-	"\ttimestamp\x18\a \x01(\tR\ttimestamp\"B\n" +
-	"\x16RecordGameEventRequest\x12(\n" +
-	"\x05event\x18\x01 \x01(\v2\x12.history.GameEventR\x05event\"m\n" +
-	"\x17RecordGameEventResponse\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1f\n" +
-	"\vrecorded_at\x18\x03 \x01(\tR\n" +
-	"recordedAt\"}\n" +
+	"\ttimestamp\x18\a \x01(\tR\ttimestamp\"\xd9\x01\n" +
+	"\x16RecordGameEventRequest\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tgame_type\x18\x03 \x01(\tR\bgameType\x12\x1e\n" +
+	"\vgame_ref_id\x18\x04 \x01(\tR\tgameRefId\x12\x16\n" +
+	"\x06action\x18\x05 \x01(\tR\x06action\x12\x18\n" +
+	"\adetails\x18\x06 \x01(\tR\adetails\x12\x1c\n" +
+	"\ttimestamp\x18\a \x01(\tR\ttimestamp\"P\n" +
+	"\x17RecordGameEventResponse\x12\x1a\n" +
+	"\brecorded\x18\x01 \x01(\bR\brecorded\x12\x19\n" +
+	"\bevent_id\x18\x02 \x01(\tR\aeventId\"}\n" +
 	"\x17GetPlayerHistoryRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tgame_type\x18\x02 \x01(\tR\bgameType\x12\x14\n" +
@@ -396,17 +440,16 @@ var file_pb_history_proto_goTypes = []any{
 	(*GetPlayerHistoryResponse)(nil), // 4: history.GetPlayerHistoryResponse
 }
 var file_pb_history_proto_depIdxs = []int32{
-	0, // 0: history.RecordGameEventRequest.event:type_name -> history.GameEvent
-	0, // 1: history.GetPlayerHistoryResponse.events:type_name -> history.GameEvent
-	1, // 2: history.HistoryService.RecordGameEvent:input_type -> history.RecordGameEventRequest
-	3, // 3: history.HistoryService.GetPlayerHistory:input_type -> history.GetPlayerHistoryRequest
-	2, // 4: history.HistoryService.RecordGameEvent:output_type -> history.RecordGameEventResponse
-	4, // 5: history.HistoryService.GetPlayerHistory:output_type -> history.GetPlayerHistoryResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: history.GetPlayerHistoryResponse.events:type_name -> history.GameEvent
+	1, // 1: history.HistoryService.RecordGameEvent:input_type -> history.RecordGameEventRequest
+	3, // 2: history.HistoryService.GetPlayerHistory:input_type -> history.GetPlayerHistoryRequest
+	2, // 3: history.HistoryService.RecordGameEvent:output_type -> history.RecordGameEventResponse
+	4, // 4: history.HistoryService.GetPlayerHistory:output_type -> history.GetPlayerHistoryResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_pb_history_proto_init() }

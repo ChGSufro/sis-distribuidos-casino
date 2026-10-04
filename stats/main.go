@@ -18,18 +18,16 @@ type server struct {
 func (s *server) GetPlayerStats(ctx context.Context, req *pb.GetPlayerStatsRequest) (*pb.GetPlayerStatsResponse, error) {
 	log.Printf("GetPlayerStats solicitado para user_id: %s", req.GetUserId())
 	return &pb.GetPlayerStatsResponse{
-		Stats: &pb.PlayerStats{
-			UserId:             req.GetUserId(),
-			TotalWageredCents:  250000, // 2500 creditos
-			TotalWonCents:      180000, // 1800 creditos
-			NetProfitCents:     -70000,
-			GamesPlayed:        34,
-			WinRate:            0.47,
-			LargestWinCents:    25000,
-			CurrentStreak:      2,
-			BestStreak:         5,
-			LastUpdated:        time.Now().Format(time.RFC3339),
-		},
+		UserId:            req.GetUserId(),
+		TotalWageredCents: 250000, // 2500 creditos
+		TotalWonCents:     180000, // 1800 creditos
+		NetProfitCents:    -70000,
+		GamesPlayed:       34,
+		WinRate:           0.47,
+		LargestWinCents:   25000,
+		CurrentStreak:     2,
+		BestStreak:        5,
+		LastUpdated:       time.Now().Format(time.RFC3339),
 	}, nil
 }
 
@@ -37,15 +35,13 @@ func (s *server) GetPlayerStats(ctx context.Context, req *pb.GetPlayerStatsReque
 func (s *server) GetPlayerGameStats(ctx context.Context, req *pb.GetPlayerGameStatsRequest) (*pb.GetPlayerGameStatsResponse, error) {
 	log.Printf("GetPlayerGameStats solicitado para user_id: %s, juego: %s", req.GetUserId(), req.GetGameType())
 	return &pb.GetPlayerGameStatsResponse{
-		Stats: &pb.GameStats{
-			UserId:             req.GetUserId(),
-			GameType:           req.GetGameType(),
-			GamesPlayed:        18,
-			TotalWageredCents:  150000,
-			TotalWonCents:      110000,
-			LargestWinCents:    25000,
-			LastUpdated:        time.Now().Format(time.RFC3339),
-		},
+		UserId:            req.GetUserId(),
+		GameType:          req.GetGameType(),
+		GamesPlayed:       18,
+		TotalWageredCents: 150000,
+		TotalWonCents:     110000,
+		LargestWinCents:   25000,
+		LastUpdated:       time.Now().Format(time.RFC3339),
 	}, nil
 }
 

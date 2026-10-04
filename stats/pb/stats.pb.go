@@ -23,16 +23,15 @@ const (
 
 // Evento de juego emitido por History Service
 type GameEvent struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	EventId   string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`         // UUID del evento
-	UserId    string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`            // Identificador del jugador
-	GameType  string                 `protobuf:"bytes,3,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"`      // "blackjack" | "poker"
-	GameRefId string                 `protobuf:"bytes,4,opt,name=game_ref_id,json=gameRefId,proto3" json:"game_ref_id,omitempty"` // ObjectId hex de la mano o mesa
-	Action    string                 `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`                          // "hand_result" | "bet_placed" | "hand_cancelled" |
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	EventId  string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`    // UUID del evento
+	UserId   string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`       // Identificador del jugador
+	GameType string                 `protobuf:"bytes,3,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"` // "blackjack" | "poker"
+	Action   string                 `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`                     // "hand_result" | "bet_placed" | "hand_cancelled" |
 	// "table_result" | "player_buyin" | "player_payout" |
 	// "player_eliminated"
-	Details       string `protobuf:"bytes,6,opt,name=details,proto3" json:"details,omitempty"`     // JSON con el contenido variable segun la accion
-	Timestamp     string `protobuf:"bytes,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Formato ISO 8601
+	Details       string `protobuf:"bytes,5,opt,name=details,proto3" json:"details,omitempty"`     // JSON con el contenido variable segun la accion
+	Timestamp     string `protobuf:"bytes,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Formato ISO 8601
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -88,13 +87,6 @@ func (x *GameEvent) GetGameType() string {
 	return ""
 }
 
-func (x *GameEvent) GetGameRefId() string {
-	if x != nil {
-		return x.GameRefId
-	}
-	return ""
-}
-
 func (x *GameEvent) GetAction() string {
 	if x != nil {
 		return x.Action
@@ -116,216 +108,6 @@ func (x *GameEvent) GetTimestamp() string {
 	return ""
 }
 
-// Estadísticas generales de un jugador
-type PlayerStats struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	TotalWageredCents int64                  `protobuf:"varint,2,opt,name=total_wagered_cents,json=totalWageredCents,proto3" json:"total_wagered_cents,omitempty"`
-	TotalWonCents     int64                  `protobuf:"varint,3,opt,name=total_won_cents,json=totalWonCents,proto3" json:"total_won_cents,omitempty"`
-	NetProfitCents    int64                  `protobuf:"varint,4,opt,name=net_profit_cents,json=netProfitCents,proto3" json:"net_profit_cents,omitempty"`
-	GamesPlayed       int32                  `protobuf:"varint,5,opt,name=games_played,json=gamesPlayed,proto3" json:"games_played,omitempty"`
-	WinRate           float64                `protobuf:"fixed64,6,opt,name=win_rate,json=winRate,proto3" json:"win_rate,omitempty"` // 0.0 - 1.0
-	LargestWinCents   int64                  `protobuf:"varint,7,opt,name=largest_win_cents,json=largestWinCents,proto3" json:"largest_win_cents,omitempty"`
-	CurrentStreak     int32                  `protobuf:"varint,8,opt,name=current_streak,json=currentStreak,proto3" json:"current_streak,omitempty"`
-	BestStreak        int32                  `protobuf:"varint,9,opt,name=best_streak,json=bestStreak,proto3" json:"best_streak,omitempty"`
-	LastUpdated       string                 `protobuf:"bytes,10,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Formato ISO 8601
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *PlayerStats) Reset() {
-	*x = PlayerStats{}
-	mi := &file_pb_stats_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PlayerStats) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PlayerStats) ProtoMessage() {}
-
-func (x *PlayerStats) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PlayerStats.ProtoReflect.Descriptor instead.
-func (*PlayerStats) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *PlayerStats) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-func (x *PlayerStats) GetTotalWageredCents() int64 {
-	if x != nil {
-		return x.TotalWageredCents
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetTotalWonCents() int64 {
-	if x != nil {
-		return x.TotalWonCents
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetNetProfitCents() int64 {
-	if x != nil {
-		return x.NetProfitCents
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetGamesPlayed() int32 {
-	if x != nil {
-		return x.GamesPlayed
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetWinRate() float64 {
-	if x != nil {
-		return x.WinRate
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetLargestWinCents() int64 {
-	if x != nil {
-		return x.LargestWinCents
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetCurrentStreak() int32 {
-	if x != nil {
-		return x.CurrentStreak
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetBestStreak() int32 {
-	if x != nil {
-		return x.BestStreak
-	}
-	return 0
-}
-
-func (x *PlayerStats) GetLastUpdated() string {
-	if x != nil {
-		return x.LastUpdated
-	}
-	return ""
-}
-
-// Estadísticas de un jugador para un juego específico
-type GameStats struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	GameType          string                 `protobuf:"bytes,2,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"` // "blackjack" | "poker"
-	GamesPlayed       int32                  `protobuf:"varint,3,opt,name=games_played,json=gamesPlayed,proto3" json:"games_played,omitempty"`
-	TotalWageredCents int64                  `protobuf:"varint,4,opt,name=total_wagered_cents,json=totalWageredCents,proto3" json:"total_wagered_cents,omitempty"`
-	TotalWonCents     int64                  `protobuf:"varint,5,opt,name=total_won_cents,json=totalWonCents,proto3" json:"total_won_cents,omitempty"`
-	LargestWinCents   int64                  `protobuf:"varint,6,opt,name=largest_win_cents,json=largestWinCents,proto3" json:"largest_win_cents,omitempty"`
-	LastUpdated       string                 `protobuf:"bytes,7,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Formato ISO 8601
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
-}
-
-func (x *GameStats) Reset() {
-	*x = GameStats{}
-	mi := &file_pb_stats_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GameStats) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GameStats) ProtoMessage() {}
-
-func (x *GameStats) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GameStats.ProtoReflect.Descriptor instead.
-func (*GameStats) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GameStats) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
-func (x *GameStats) GetGameType() string {
-	if x != nil {
-		return x.GameType
-	}
-	return ""
-}
-
-func (x *GameStats) GetGamesPlayed() int32 {
-	if x != nil {
-		return x.GamesPlayed
-	}
-	return 0
-}
-
-func (x *GameStats) GetTotalWageredCents() int64 {
-	if x != nil {
-		return x.TotalWageredCents
-	}
-	return 0
-}
-
-func (x *GameStats) GetTotalWonCents() int64 {
-	if x != nil {
-		return x.TotalWonCents
-	}
-	return 0
-}
-
-func (x *GameStats) GetLargestWinCents() int64 {
-	if x != nil {
-		return x.LargestWinCents
-	}
-	return 0
-}
-
-func (x *GameStats) GetLastUpdated() string {
-	if x != nil {
-		return x.LastUpdated
-	}
-	return ""
-}
-
 // Entrada del ranking de un jugador
 type LeaderboardEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -340,7 +122,7 @@ type LeaderboardEntry struct {
 
 func (x *LeaderboardEntry) Reset() {
 	*x = LeaderboardEntry{}
-	mi := &file_pb_stats_proto_msgTypes[3]
+	mi := &file_pb_stats_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +134,7 @@ func (x *LeaderboardEntry) String() string {
 func (*LeaderboardEntry) ProtoMessage() {}
 
 func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[3]
+	mi := &file_pb_stats_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +147,7 @@ func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaderboardEntry.ProtoReflect.Descriptor instead.
 func (*LeaderboardEntry) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{3}
+	return file_pb_stats_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *LeaderboardEntry) GetRank() int32 {
@@ -414,7 +196,7 @@ type StreamAck struct {
 
 func (x *StreamAck) Reset() {
 	*x = StreamAck{}
-	mi := &file_pb_stats_proto_msgTypes[4]
+	mi := &file_pb_stats_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +208,7 @@ func (x *StreamAck) String() string {
 func (*StreamAck) ProtoMessage() {}
 
 func (x *StreamAck) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[4]
+	mi := &file_pb_stats_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +221,7 @@ func (x *StreamAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamAck.ProtoReflect.Descriptor instead.
 func (*StreamAck) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{4}
+	return file_pb_stats_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *StreamAck) GetReceivedCount() int32 {
@@ -465,7 +247,7 @@ type GetPlayerStatsRequest struct {
 
 func (x *GetPlayerStatsRequest) Reset() {
 	*x = GetPlayerStatsRequest{}
-	mi := &file_pb_stats_proto_msgTypes[5]
+	mi := &file_pb_stats_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -477,7 +259,7 @@ func (x *GetPlayerStatsRequest) String() string {
 func (*GetPlayerStatsRequest) ProtoMessage() {}
 
 func (x *GetPlayerStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[5]
+	mi := &file_pb_stats_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -490,7 +272,7 @@ func (x *GetPlayerStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlayerStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetPlayerStatsRequest) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{5}
+	return file_pb_stats_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetPlayerStatsRequest) GetUserId() string {
@@ -501,15 +283,24 @@ func (x *GetPlayerStatsRequest) GetUserId() string {
 }
 
 type GetPlayerStatsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Stats         *PlayerStats           `protobuf:"bytes,1,opt,name=stats,proto3" json:"stats,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	TotalWageredCents int64                  `protobuf:"varint,2,opt,name=total_wagered_cents,json=totalWageredCents,proto3" json:"total_wagered_cents,omitempty"`
+	TotalWonCents     int64                  `protobuf:"varint,3,opt,name=total_won_cents,json=totalWonCents,proto3" json:"total_won_cents,omitempty"`
+	NetProfitCents    int64                  `protobuf:"varint,4,opt,name=net_profit_cents,json=netProfitCents,proto3" json:"net_profit_cents,omitempty"`
+	GamesPlayed       int32                  `protobuf:"varint,5,opt,name=games_played,json=gamesPlayed,proto3" json:"games_played,omitempty"`
+	WinRate           float64                `protobuf:"fixed64,6,opt,name=win_rate,json=winRate,proto3" json:"win_rate,omitempty"` // 0.0 - 1.0
+	LargestWinCents   int64                  `protobuf:"varint,7,opt,name=largest_win_cents,json=largestWinCents,proto3" json:"largest_win_cents,omitempty"`
+	CurrentStreak     int32                  `protobuf:"varint,8,opt,name=current_streak,json=currentStreak,proto3" json:"current_streak,omitempty"` // positivo = victorias, negativo = derrotas
+	BestStreak        int32                  `protobuf:"varint,9,opt,name=best_streak,json=bestStreak,proto3" json:"best_streak,omitempty"`
+	LastUpdated       string                 `protobuf:"bytes,10,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Formato ISO 8601
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetPlayerStatsResponse) Reset() {
 	*x = GetPlayerStatsResponse{}
-	mi := &file_pb_stats_proto_msgTypes[6]
+	mi := &file_pb_stats_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -521,7 +312,7 @@ func (x *GetPlayerStatsResponse) String() string {
 func (*GetPlayerStatsResponse) ProtoMessage() {}
 
 func (x *GetPlayerStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[6]
+	mi := &file_pb_stats_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -534,14 +325,77 @@ func (x *GetPlayerStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlayerStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetPlayerStatsResponse) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{6}
+	return file_pb_stats_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetPlayerStatsResponse) GetStats() *PlayerStats {
+func (x *GetPlayerStatsResponse) GetUserId() string {
 	if x != nil {
-		return x.Stats
+		return x.UserId
 	}
-	return nil
+	return ""
+}
+
+func (x *GetPlayerStatsResponse) GetTotalWageredCents() int64 {
+	if x != nil {
+		return x.TotalWageredCents
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetTotalWonCents() int64 {
+	if x != nil {
+		return x.TotalWonCents
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetNetProfitCents() int64 {
+	if x != nil {
+		return x.NetProfitCents
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetGamesPlayed() int32 {
+	if x != nil {
+		return x.GamesPlayed
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetWinRate() float64 {
+	if x != nil {
+		return x.WinRate
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetLargestWinCents() int64 {
+	if x != nil {
+		return x.LargestWinCents
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetCurrentStreak() int32 {
+	if x != nil {
+		return x.CurrentStreak
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetBestStreak() int32 {
+	if x != nil {
+		return x.BestStreak
+	}
+	return 0
+}
+
+func (x *GetPlayerStatsResponse) GetLastUpdated() string {
+	if x != nil {
+		return x.LastUpdated
+	}
+	return ""
 }
 
 type GetPlayerGameStatsRequest struct {
@@ -554,7 +408,7 @@ type GetPlayerGameStatsRequest struct {
 
 func (x *GetPlayerGameStatsRequest) Reset() {
 	*x = GetPlayerGameStatsRequest{}
-	mi := &file_pb_stats_proto_msgTypes[7]
+	mi := &file_pb_stats_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -566,7 +420,7 @@ func (x *GetPlayerGameStatsRequest) String() string {
 func (*GetPlayerGameStatsRequest) ProtoMessage() {}
 
 func (x *GetPlayerGameStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[7]
+	mi := &file_pb_stats_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -579,7 +433,7 @@ func (x *GetPlayerGameStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlayerGameStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetPlayerGameStatsRequest) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{7}
+	return file_pb_stats_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetPlayerGameStatsRequest) GetUserId() string {
@@ -597,15 +451,21 @@ func (x *GetPlayerGameStatsRequest) GetGameType() string {
 }
 
 type GetPlayerGameStatsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Stats         *GameStats             `protobuf:"bytes,1,opt,name=stats,proto3" json:"stats,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	GameType          string                 `protobuf:"bytes,2,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"` // "blackjack" | "poker"
+	GamesPlayed       int32                  `protobuf:"varint,3,opt,name=games_played,json=gamesPlayed,proto3" json:"games_played,omitempty"`
+	TotalWageredCents int64                  `protobuf:"varint,4,opt,name=total_wagered_cents,json=totalWageredCents,proto3" json:"total_wagered_cents,omitempty"`
+	TotalWonCents     int64                  `protobuf:"varint,5,opt,name=total_won_cents,json=totalWonCents,proto3" json:"total_won_cents,omitempty"`
+	LargestWinCents   int64                  `protobuf:"varint,6,opt,name=largest_win_cents,json=largestWinCents,proto3" json:"largest_win_cents,omitempty"`
+	LastUpdated       string                 `protobuf:"bytes,7,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Formato ISO 8601
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetPlayerGameStatsResponse) Reset() {
 	*x = GetPlayerGameStatsResponse{}
-	mi := &file_pb_stats_proto_msgTypes[8]
+	mi := &file_pb_stats_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -617,7 +477,7 @@ func (x *GetPlayerGameStatsResponse) String() string {
 func (*GetPlayerGameStatsResponse) ProtoMessage() {}
 
 func (x *GetPlayerGameStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[8]
+	mi := &file_pb_stats_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -630,14 +490,56 @@ func (x *GetPlayerGameStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlayerGameStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetPlayerGameStatsResponse) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{8}
+	return file_pb_stats_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *GetPlayerGameStatsResponse) GetStats() *GameStats {
+func (x *GetPlayerGameStatsResponse) GetUserId() string {
 	if x != nil {
-		return x.Stats
+		return x.UserId
 	}
-	return nil
+	return ""
+}
+
+func (x *GetPlayerGameStatsResponse) GetGameType() string {
+	if x != nil {
+		return x.GameType
+	}
+	return ""
+}
+
+func (x *GetPlayerGameStatsResponse) GetGamesPlayed() int32 {
+	if x != nil {
+		return x.GamesPlayed
+	}
+	return 0
+}
+
+func (x *GetPlayerGameStatsResponse) GetTotalWageredCents() int64 {
+	if x != nil {
+		return x.TotalWageredCents
+	}
+	return 0
+}
+
+func (x *GetPlayerGameStatsResponse) GetTotalWonCents() int64 {
+	if x != nil {
+		return x.TotalWonCents
+	}
+	return 0
+}
+
+func (x *GetPlayerGameStatsResponse) GetLargestWinCents() int64 {
+	if x != nil {
+		return x.LargestWinCents
+	}
+	return 0
+}
+
+func (x *GetPlayerGameStatsResponse) GetLastUpdated() string {
+	if x != nil {
+		return x.LastUpdated
+	}
+	return ""
 }
 
 type GetLeaderboardRequest struct {
@@ -650,7 +552,7 @@ type GetLeaderboardRequest struct {
 
 func (x *GetLeaderboardRequest) Reset() {
 	*x = GetLeaderboardRequest{}
-	mi := &file_pb_stats_proto_msgTypes[9]
+	mi := &file_pb_stats_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -662,7 +564,7 @@ func (x *GetLeaderboardRequest) String() string {
 func (*GetLeaderboardRequest) ProtoMessage() {}
 
 func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[9]
+	mi := &file_pb_stats_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -675,7 +577,7 @@ func (x *GetLeaderboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardRequest.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardRequest) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{9}
+	return file_pb_stats_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetLeaderboardRequest) GetPeriod() string {
@@ -704,7 +606,7 @@ type GetLeaderboardResponse struct {
 
 func (x *GetLeaderboardResponse) Reset() {
 	*x = GetLeaderboardResponse{}
-	mi := &file_pb_stats_proto_msgTypes[10]
+	mi := &file_pb_stats_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -716,7 +618,7 @@ func (x *GetLeaderboardResponse) String() string {
 func (*GetLeaderboardResponse) ProtoMessage() {}
 
 func (x *GetLeaderboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pb_stats_proto_msgTypes[10]
+	mi := &file_pb_stats_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -729,7 +631,7 @@ func (x *GetLeaderboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLeaderboardResponse.ProtoReflect.Descriptor instead.
 func (*GetLeaderboardResponse) Descriptor() ([]byte, []int) {
-	return file_pb_stats_proto_rawDescGZIP(), []int{10}
+	return file_pb_stats_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetLeaderboardResponse) GetPeriod() string {
@@ -764,36 +666,14 @@ var File_pb_stats_proto protoreflect.FileDescriptor
 
 const file_pb_stats_proto_rawDesc = "" +
 	"\n" +
-	"\x0epb/stats.proto\x12\x05stats\"\xcc\x01\n" +
+	"\x0epb/stats.proto\x12\x05stats\"\xac\x01\n" +
 	"\tGameEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
-	"\tgame_type\x18\x03 \x01(\tR\bgameType\x12\x1e\n" +
-	"\vgame_ref_id\x18\x04 \x01(\tR\tgameRefId\x12\x16\n" +
-	"\x06action\x18\x05 \x01(\tR\x06action\x12\x18\n" +
-	"\adetails\x18\x06 \x01(\tR\adetails\x12\x1c\n" +
-	"\ttimestamp\x18\a \x01(\tR\ttimestamp\"\xfd\x02\n" +
-	"\vPlayerStats\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
-	"\x13total_wagered_cents\x18\x02 \x01(\x03R\x11totalWageredCents\x12&\n" +
-	"\x0ftotal_won_cents\x18\x03 \x01(\x03R\rtotalWonCents\x12(\n" +
-	"\x10net_profit_cents\x18\x04 \x01(\x03R\x0enetProfitCents\x12!\n" +
-	"\fgames_played\x18\x05 \x01(\x05R\vgamesPlayed\x12\x19\n" +
-	"\bwin_rate\x18\x06 \x01(\x01R\awinRate\x12*\n" +
-	"\x11largest_win_cents\x18\a \x01(\x03R\x0flargestWinCents\x12%\n" +
-	"\x0ecurrent_streak\x18\b \x01(\x05R\rcurrentStreak\x12\x1f\n" +
-	"\vbest_streak\x18\t \x01(\x05R\n" +
-	"bestStreak\x12!\n" +
-	"\flast_updated\x18\n" +
-	" \x01(\tR\vlastUpdated\"\x8b\x02\n" +
-	"\tGameStats\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
-	"\tgame_type\x18\x02 \x01(\tR\bgameType\x12!\n" +
-	"\fgames_played\x18\x03 \x01(\x05R\vgamesPlayed\x12.\n" +
-	"\x13total_wagered_cents\x18\x04 \x01(\x03R\x11totalWageredCents\x12&\n" +
-	"\x0ftotal_won_cents\x18\x05 \x01(\x03R\rtotalWonCents\x12*\n" +
-	"\x11largest_win_cents\x18\x06 \x01(\x03R\x0flargestWinCents\x12!\n" +
-	"\flast_updated\x18\a \x01(\tR\vlastUpdated\"\x9f\x01\n" +
+	"\tgame_type\x18\x03 \x01(\tR\bgameType\x12\x16\n" +
+	"\x06action\x18\x04 \x01(\tR\x06action\x12\x18\n" +
+	"\adetails\x18\x05 \x01(\tR\adetails\x12\x1c\n" +
+	"\ttimestamp\x18\x06 \x01(\tR\ttimestamp\"\x9f\x01\n" +
 	"\x10LeaderboardEntry\x12\x12\n" +
 	"\x04rank\x18\x01 \x01(\x05R\x04rank\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
@@ -805,14 +685,31 @@ const file_pb_stats_proto_rawDesc = "" +
 	"\x0ereceived_count\x18\x01 \x01(\x05R\rreceivedCount\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\"0\n" +
 	"\x15GetPlayerStatsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"B\n" +
-	"\x16GetPlayerStatsResponse\x12(\n" +
-	"\x05stats\x18\x01 \x01(\v2\x12.stats.PlayerStatsR\x05stats\"Q\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x88\x03\n" +
+	"\x16GetPlayerStatsResponse\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12.\n" +
+	"\x13total_wagered_cents\x18\x02 \x01(\x03R\x11totalWageredCents\x12&\n" +
+	"\x0ftotal_won_cents\x18\x03 \x01(\x03R\rtotalWonCents\x12(\n" +
+	"\x10net_profit_cents\x18\x04 \x01(\x03R\x0enetProfitCents\x12!\n" +
+	"\fgames_played\x18\x05 \x01(\x05R\vgamesPlayed\x12\x19\n" +
+	"\bwin_rate\x18\x06 \x01(\x01R\awinRate\x12*\n" +
+	"\x11largest_win_cents\x18\a \x01(\x03R\x0flargestWinCents\x12%\n" +
+	"\x0ecurrent_streak\x18\b \x01(\x05R\rcurrentStreak\x12\x1f\n" +
+	"\vbest_streak\x18\t \x01(\x05R\n" +
+	"bestStreak\x12!\n" +
+	"\flast_updated\x18\n" +
+	" \x01(\tR\vlastUpdated\"Q\n" +
 	"\x19GetPlayerGameStatsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
-	"\tgame_type\x18\x02 \x01(\tR\bgameType\"D\n" +
-	"\x1aGetPlayerGameStatsResponse\x12&\n" +
-	"\x05stats\x18\x01 \x01(\v2\x10.stats.GameStatsR\x05stats\"E\n" +
+	"\tgame_type\x18\x02 \x01(\tR\bgameType\"\x9c\x02\n" +
+	"\x1aGetPlayerGameStatsResponse\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tgame_type\x18\x02 \x01(\tR\bgameType\x12!\n" +
+	"\fgames_played\x18\x03 \x01(\x05R\vgamesPlayed\x12.\n" +
+	"\x13total_wagered_cents\x18\x04 \x01(\x03R\x11totalWageredCents\x12&\n" +
+	"\x0ftotal_won_cents\x18\x05 \x01(\x03R\rtotalWonCents\x12*\n" +
+	"\x11largest_win_cents\x18\x06 \x01(\x03R\x0flargestWinCents\x12!\n" +
+	"\flast_updated\x18\a \x01(\tR\vlastUpdated\"E\n" +
 	"\x15GetLeaderboardRequest\x12\x16\n" +
 	"\x06period\x18\x01 \x01(\tR\x06period\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\"\xa7\x01\n" +
@@ -840,37 +737,33 @@ func file_pb_stats_proto_rawDescGZIP() []byte {
 	return file_pb_stats_proto_rawDescData
 }
 
-var file_pb_stats_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_pb_stats_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_pb_stats_proto_goTypes = []any{
 	(*GameEvent)(nil),                  // 0: stats.GameEvent
-	(*PlayerStats)(nil),                // 1: stats.PlayerStats
-	(*GameStats)(nil),                  // 2: stats.GameStats
-	(*LeaderboardEntry)(nil),           // 3: stats.LeaderboardEntry
-	(*StreamAck)(nil),                  // 4: stats.StreamAck
-	(*GetPlayerStatsRequest)(nil),      // 5: stats.GetPlayerStatsRequest
-	(*GetPlayerStatsResponse)(nil),     // 6: stats.GetPlayerStatsResponse
-	(*GetPlayerGameStatsRequest)(nil),  // 7: stats.GetPlayerGameStatsRequest
-	(*GetPlayerGameStatsResponse)(nil), // 8: stats.GetPlayerGameStatsResponse
-	(*GetLeaderboardRequest)(nil),      // 9: stats.GetLeaderboardRequest
-	(*GetLeaderboardResponse)(nil),     // 10: stats.GetLeaderboardResponse
+	(*LeaderboardEntry)(nil),           // 1: stats.LeaderboardEntry
+	(*StreamAck)(nil),                  // 2: stats.StreamAck
+	(*GetPlayerStatsRequest)(nil),      // 3: stats.GetPlayerStatsRequest
+	(*GetPlayerStatsResponse)(nil),     // 4: stats.GetPlayerStatsResponse
+	(*GetPlayerGameStatsRequest)(nil),  // 5: stats.GetPlayerGameStatsRequest
+	(*GetPlayerGameStatsResponse)(nil), // 6: stats.GetPlayerGameStatsResponse
+	(*GetLeaderboardRequest)(nil),      // 7: stats.GetLeaderboardRequest
+	(*GetLeaderboardResponse)(nil),     // 8: stats.GetLeaderboardResponse
 }
 var file_pb_stats_proto_depIdxs = []int32{
-	1,  // 0: stats.GetPlayerStatsResponse.stats:type_name -> stats.PlayerStats
-	2,  // 1: stats.GetPlayerGameStatsResponse.stats:type_name -> stats.GameStats
-	3,  // 2: stats.GetLeaderboardResponse.entries:type_name -> stats.LeaderboardEntry
-	0,  // 3: stats.StatsService.StreamGameEvents:input_type -> stats.GameEvent
-	5,  // 4: stats.StatsService.GetPlayerStats:input_type -> stats.GetPlayerStatsRequest
-	7,  // 5: stats.StatsService.GetPlayerGameStats:input_type -> stats.GetPlayerGameStatsRequest
-	9,  // 6: stats.StatsService.GetLeaderboard:input_type -> stats.GetLeaderboardRequest
-	4,  // 7: stats.StatsService.StreamGameEvents:output_type -> stats.StreamAck
-	6,  // 8: stats.StatsService.GetPlayerStats:output_type -> stats.GetPlayerStatsResponse
-	8,  // 9: stats.StatsService.GetPlayerGameStats:output_type -> stats.GetPlayerGameStatsResponse
-	10, // 10: stats.StatsService.GetLeaderboard:output_type -> stats.GetLeaderboardResponse
-	7,  // [7:11] is the sub-list for method output_type
-	3,  // [3:7] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	1, // 0: stats.GetLeaderboardResponse.entries:type_name -> stats.LeaderboardEntry
+	0, // 1: stats.StatsService.StreamGameEvents:input_type -> stats.GameEvent
+	3, // 2: stats.StatsService.GetPlayerStats:input_type -> stats.GetPlayerStatsRequest
+	5, // 3: stats.StatsService.GetPlayerGameStats:input_type -> stats.GetPlayerGameStatsRequest
+	7, // 4: stats.StatsService.GetLeaderboard:input_type -> stats.GetLeaderboardRequest
+	2, // 5: stats.StatsService.StreamGameEvents:output_type -> stats.StreamAck
+	4, // 6: stats.StatsService.GetPlayerStats:output_type -> stats.GetPlayerStatsResponse
+	6, // 7: stats.StatsService.GetPlayerGameStats:output_type -> stats.GetPlayerGameStatsResponse
+	8, // 8: stats.StatsService.GetLeaderboard:output_type -> stats.GetLeaderboardResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_pb_stats_proto_init() }
@@ -884,7 +777,7 @@ func file_pb_stats_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_stats_proto_rawDesc), len(file_pb_stats_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
