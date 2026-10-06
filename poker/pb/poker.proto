@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package poker;
+
+option go_package = "github.com/ChGSufro/sis-distribuidos-casino/poker/pb";
+
+// ─────────────────────────────────────────────────────────
+// Entidades del Dominio
+// ─────────────────────────────────────────────────────────
+
+// Carta del mazo. En Poker no lleva valor numerico:
+// el valor se deriva de la posicion dentro de la mano.
+message Card {
+  string suit = 1; // "H" (Corazones), "D" (Diamantes), "C" (Treboles), "S" (Picas)
+  string rank = 2; // "2".."10", "J", "Q", "K", "A"
+}
+
+// Mesa de poker. Entidad central del servicio.
+message Table {
+  string table_id          = 1; // ObjectId hex
+  string name              = 2;
+  int64  small_blind_cents = 3;
+  int64  big_blind_cents   = 4;
+  int32  max_players       = 5; // 2..10
+  int32  current_players   = 6; // jugadores sentados actualmente
+  string status            = 7; // "waiting", "active", "paused", "closed"
+}
+
+// Jugador sentado en la mesa, sin informacion privada
+message Seat {
+  int32  seat_position = 1; // 1..max_players
+  string user_id       = 2;
+  int64  stack_cents   = 3;
+  string status        = 4; // "active", "folded", "all_in", "sitting_out"
+}
+
+// Estado de un jugador dentro de la ronda en curso
+message PlayerState {
+  string user_id                   = 1;
+  int32  seat_position             = 2;
+  int64  stack_cents               = 3;
+  int64  total_bet_in_round_cents = 4;
+  string status                    = 5; // "active", "folded", "all_in"
+}
+
+// Ganador de un bote al cerrar la ronda
+message Winner {
+  string user_id      = 1;
+  string pot_type     = 2; // "main", "side"
+  int64  amount_cents = 3;
+}
+
+// Ronda en curso. your_hole_cards contiene solo las cartas
+// privadas del usuario que consulta; las demas no se envian
+// hasta el showdown.
+message RoundState {
+  string         round_id          = 1;
+  string         stage             = 2; // "waiting", "preflop", "flop", "turn", "river", "settled"
+  repeated Card  community_cards   = 3;
+  repeated Card  your_hole_cards   = 4;
+  int64          pot_size_cents    = 5;
+  int64          current_bet_cents = 6;
+  int32          current_turn      = 7; // seat_position del siguiente en actuar
+  string         turn_expires_at   = 8; // ISO 8601
+}
+
+// Difusion del estado de la mesa a todos los jugadores sentados
+message TableUpdate {
+  string             round_id          = 1;
+  string             stage             = 2;
+  int32              current_turn      = 3;
+  int64              current_bet_cents = 4;
+  int64              pot_size_cents    = 5;
+  repeated Card      community_cards   = 6;
+  repeated PlayerState players         = 7;
+  string             turn_expires_at   = 8; // ISO 8601
+  repeated Winner    winners           = 9; // vacio mientras stage != "settled"
+}
+
+// ─────────────────────────────────────────────────────────
+// Mensajes de Solicitud y Respuesta
+// ─────────────────────────────────────────────────────────
+
+// Listado de mesas, opcionalmente filtrado por estado
+message ListTablesRequest {
+  string status_filter = 1; // "waiting", "active", o vacio = todas
+}
+
+message ListTablesResponse {
+  repeated Table tables = 1;
+}
+
+// Creacion de una mesa por parte de un usuario
+message CreateTableRequest {
+  string user_id           = 1; // usuario que crea la mesa
+  string name              = 2;
+  int64  small_blind_cents = 3;
+  int64  big_blind_cents   = 4;
+  int32  max_players       = 5; // 2..10
+}
+
+message CreateTableResponse {
+  Table table = 1; // recien creada: current_players = 0, status = "waiting"
+}
+
+// Compra de fichas y asignacion de asiento.
+// El buy-in se reserva internamente via Wallet.Hold.
+message JoinTableRequest {
+  string table_id            = 1;
+  string user_id             = 2;
+  int64  buy_in_amount_cents = 3; // > 0
+  int32  preferred_seat      = 4; // 0 = asignar el primer asiento libre
+}
+
+message JoinTableResponse {
+  string table_id      = 1;
+  int32  seat_position = 2;
+  int64  stack_cents   = 3; // fichas acreditadas en mesa
+  string hold_id       = 4; // referencia a la reserva en Wallet
+}
+
+// Salida de la mesa. El stack se liquida via Wallet.Settle.
+message LeaveTableRequest {
+  string table_id = 1;
+  string user_id  = 2;
+}
+
+message LeaveTableResponse {
+  string table_id             = 1;
+  int64  final_stack_cents    = 2; // fichas al momento de salir
+  int64  settled_amount_cents = 3; // monto devuelto a la billetera
+}
+
+// Accion del jugador en su turno de la ronda en curso
+message PlayerActionRequest {
+  string table_id     = 1;
+  string round_id     = 2;
+  string user_id      = 3;
+  string action       = 4; // "fold", "check", "call", "raise", "all-in"
+  int64  amount_cents = 5; // monto del raise, requerido solo para "raise"
+}
+
+message PlayerActionResponse {
+  TableUpdate update = 1; // se difunde a todos los jugadores de la mesa
+}
+
+// Consulta del estado completo de una mesa.
+// user_id determina que cartas privadas se incluyen.
+message GetTableStateRequest {
+  string table_id = 1;
+  string user_id  = 2;
+}
+
+message GetTableStateResponse {
+  Table       table         = 1;
+  repeated Seat seats        = 2;
+  RoundState  current_round = 3; // vacio si la mesa no tiene ronda en curso
+}
+
+// ─────────────────────────────────────────────────────────
+// Definición del Servicio gRPC
+// ─────────────────────────────────────────────────────────
+
+service PokerService {
+  rpc ListTables    (ListTablesRequest)    returns (ListTablesResponse);
+  rpc CreateTable   (CreateTableRequest)   returns (CreateTableResponse);
+  rpc JoinTable     (JoinTableRequest)     returns (JoinTableResponse);
+  rpc LeaveTable    (LeaveTableRequest)    returns (LeaveTableResponse);
+  rpc PlayerAction  (PlayerActionRequest)  returns (PlayerActionResponse);
+  rpc GetTableState (GetTableStateRequest) returns (GetTableStateResponse);
+}
