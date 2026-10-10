@@ -1,0 +1,61 @@
+# ==========================================
+# Variables de Entorno y Secretos
+# ==========================================
+# Pauta: docker compose up con variables en .env
+.env
+*.env.local
+*.env.*.local
+!.env.example
+
+# ==========================================
+# Compilación y Binarios de Go
+# ==========================================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+
+# Binarios de servicios
+wallet/wallet
+blackjack/blackjack
+poker/poker
+history/history
+stats/stats
+gateway/gateway
+
+# ==========================================
+# Persistencia y Volúmenes de Bases de Datos
+# ==========================================
+data/
+*.db
+*.sqlite
+postgres-data/
+mongo-data/
+
+# ==========================================
+# Archivos de IDE y Editores
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.directory
+
+# ==========================================
+# Archivos del Sistema Operativo
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+pauta-grupal.md
+.Trashes
+ehthumbs.db
+Thumbs.db
+
