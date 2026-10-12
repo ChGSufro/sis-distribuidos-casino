@@ -2,11 +2,11 @@
 
 ### 👤 Chris (Wallet Service y Blackjack Game Service)
 #### Wallet Service (`wallet_db` — PostgreSQL)
-- [ ] Diseñar esquema SQL e inicialización para tablas `wallets`, `holds` y `transactions`.
-- [ ] Implementar libro contable ACID con restricción `CHECK (balance_cents >= 0)` y control de concurrencia optimista (`version`).
-- [ ] Implementar flujo transaccional de reservas: `Hold` $\rightarrow$ `Settle` / `Release`.
-- [ ] Exponer métodos gRPC: `InitWallet`, `GetBalance`, `Deposit`, `Hold`, `Settle`, `Release`.
-- [ ] Crear `Dockerfile` y configuración de PostgreSQL para Docker Compose.
+- [x] Diseñar esquema SQL e inicialización para tablas `wallets`, `holds` y `transactions`.
+- [x] Implementar libro contable ACID con restricción `CHECK (balance_cents >= 0)` y control de concurrencia optimista (`version`).
+- [x] Implementar flujo transaccional de reservas: `Hold` $\rightarrow$ `Settle` / `Release`.
+- [x] Exponer métodos gRPC: `InitWallet`, `GetBalance`, `Deposit`, `Hold`, `Settle`, `Release`.
+- [x] Crear `Dockerfile` y configuración de PostgreSQL para Docker Compose.
 #### Blackjack Game Service (`bj_state_db` — MongoDB)
 - [ ] Configurar conexión y persistencia en MongoDB para la colección `hands`.
 - [ ] Implementar motor de Blackjack: valor de manos con Ases, split, double down, surrender y turno automático de la casa (dealer).
