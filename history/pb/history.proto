@@ -54,6 +54,11 @@ message GetPlayerHistoryResponse {
   int32              total_count = 2;
 }
 
+// Suscripción al stream de eventos emitido por History
+message StreamGameEventsRequest {
+  string cursor = 1; // ObjectId hex del ultimo evento recibido; vacio = desde el inicio
+}
+
 // ─────────────────────────────────────────────────────────
 // Definición del Servicio gRPC
 // ─────────────────────────────────────────────────────────
@@ -61,4 +66,5 @@ message GetPlayerHistoryResponse {
 service HistoryService {
   rpc RecordGameEvent  (RecordGameEventRequest)  returns (RecordGameEventResponse);
   rpc GetPlayerHistory (GetPlayerHistoryRequest) returns (GetPlayerHistoryResponse);
+  rpc StreamGameEvents (StreamGameEventsRequest) returns (stream GameEvent);
 }

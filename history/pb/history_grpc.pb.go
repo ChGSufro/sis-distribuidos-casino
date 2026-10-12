@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	HistoryService_RecordGameEvent_FullMethodName  = "/history.HistoryService/RecordGameEvent"
 	HistoryService_GetPlayerHistory_FullMethodName = "/history.HistoryService/GetPlayerHistory"
+	HistoryService_StreamGameEvents_FullMethodName = "/history.HistoryService/StreamGameEvents"
 )
 
 // HistoryServiceClient is the client API for HistoryService service.
@@ -29,6 +30,7 @@ const (
 type HistoryServiceClient interface {
 	RecordGameEvent(ctx context.Context, in *RecordGameEventRequest, opts ...grpc.CallOption) (*RecordGameEventResponse, error)
 	GetPlayerHistory(ctx context.Context, in *GetPlayerHistoryRequest, opts ...grpc.CallOption) (*GetPlayerHistoryResponse, error)
+	StreamGameEvents(ctx context.Context, in *StreamGameEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GameEvent], error)
 }
 
 type historyServiceClient struct {
@@ -59,12 +61,32 @@ func (c *historyServiceClient) GetPlayerHistory(ctx context.Context, in *GetPlay
 	return out, nil
 }
 
+func (c *historyServiceClient) StreamGameEvents(ctx context.Context, in *StreamGameEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GameEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &HistoryService_ServiceDesc.Streams[0], HistoryService_StreamGameEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamGameEventsRequest, GameEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type HistoryService_StreamGameEventsClient = grpc.ServerStreamingClient[GameEvent]
+
 // HistoryServiceServer is the server API for HistoryService service.
 // All implementations must embed UnimplementedHistoryServiceServer
 // for forward compatibility.
 type HistoryServiceServer interface {
 	RecordGameEvent(context.Context, *RecordGameEventRequest) (*RecordGameEventResponse, error)
 	GetPlayerHistory(context.Context, *GetPlayerHistoryRequest) (*GetPlayerHistoryResponse, error)
+	StreamGameEvents(*StreamGameEventsRequest, grpc.ServerStreamingServer[GameEvent]) error
 	mustEmbedUnimplementedHistoryServiceServer()
 }
 
@@ -80,6 +102,9 @@ func (UnimplementedHistoryServiceServer) RecordGameEvent(context.Context, *Recor
 }
 func (UnimplementedHistoryServiceServer) GetPlayerHistory(context.Context, *GetPlayerHistoryRequest) (*GetPlayerHistoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPlayerHistory not implemented")
+}
+func (UnimplementedHistoryServiceServer) StreamGameEvents(*StreamGameEventsRequest, grpc.ServerStreamingServer[GameEvent]) error {
+	return status.Error(codes.Unimplemented, "method StreamGameEvents not implemented")
 }
 func (UnimplementedHistoryServiceServer) mustEmbedUnimplementedHistoryServiceServer() {}
 func (UnimplementedHistoryServiceServer) testEmbeddedByValue()                        {}
@@ -138,6 +163,17 @@ func _HistoryService_GetPlayerHistory_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HistoryService_StreamGameEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamGameEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(HistoryServiceServer).StreamGameEvents(m, &grpc.GenericServerStream[StreamGameEventsRequest, GameEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type HistoryService_StreamGameEventsServer = grpc.ServerStreamingServer[GameEvent]
+
 // HistoryService_ServiceDesc is the grpc.ServiceDesc for HistoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -154,6 +190,12 @@ var HistoryService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _HistoryService_GetPlayerHistory_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamGameEvents",
+			Handler:       _HistoryService_StreamGameEvents_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "pb/history.proto",
 }

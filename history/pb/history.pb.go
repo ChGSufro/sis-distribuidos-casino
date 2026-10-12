@@ -382,6 +382,51 @@ func (x *GetPlayerHistoryResponse) GetTotalCount() int32 {
 	return 0
 }
 
+// Suscripción al stream de eventos emitido por History
+type StreamGameEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        string                 `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"` // ObjectId hex del ultimo evento recibido; vacio = desde el inicio
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamGameEventsRequest) Reset() {
+	*x = StreamGameEventsRequest{}
+	mi := &file_pb_history_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamGameEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamGameEventsRequest) ProtoMessage() {}
+
+func (x *StreamGameEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pb_history_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamGameEventsRequest.ProtoReflect.Descriptor instead.
+func (*StreamGameEventsRequest) Descriptor() ([]byte, []int) {
+	return file_pb_history_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StreamGameEventsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
 var File_pb_history_proto protoreflect.FileDescriptor
 
 const file_pb_history_proto_rawDesc = "" +
@@ -414,10 +459,13 @@ const file_pb_history_proto_rawDesc = "" +
 	"\x18GetPlayerHistoryResponse\x12*\n" +
 	"\x06events\x18\x01 \x03(\v2\x12.history.GameEventR\x06events\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount2\xbf\x01\n" +
+	"totalCount\"1\n" +
+	"\x17StreamGameEventsRequest\x12\x16\n" +
+	"\x06cursor\x18\x01 \x01(\tR\x06cursor2\x8b\x02\n" +
 	"\x0eHistoryService\x12T\n" +
 	"\x0fRecordGameEvent\x12\x1f.history.RecordGameEventRequest\x1a .history.RecordGameEventResponse\x12W\n" +
-	"\x10GetPlayerHistory\x12 .history.GetPlayerHistoryRequest\x1a!.history.GetPlayerHistoryResponseB8Z6github.com/ChGSufro/sis-distribuidos-casino/history/pbb\x06proto3"
+	"\x10GetPlayerHistory\x12 .history.GetPlayerHistoryRequest\x1a!.history.GetPlayerHistoryResponse\x12J\n" +
+	"\x10StreamGameEvents\x12 .history.StreamGameEventsRequest\x1a\x12.history.GameEvent0\x01B8Z6github.com/ChGSufro/sis-distribuidos-casino/history/pbb\x06proto3"
 
 var (
 	file_pb_history_proto_rawDescOnce sync.Once
@@ -431,22 +479,25 @@ func file_pb_history_proto_rawDescGZIP() []byte {
 	return file_pb_history_proto_rawDescData
 }
 
-var file_pb_history_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_pb_history_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pb_history_proto_goTypes = []any{
 	(*GameEvent)(nil),                // 0: history.GameEvent
 	(*RecordGameEventRequest)(nil),   // 1: history.RecordGameEventRequest
 	(*RecordGameEventResponse)(nil),  // 2: history.RecordGameEventResponse
 	(*GetPlayerHistoryRequest)(nil),  // 3: history.GetPlayerHistoryRequest
 	(*GetPlayerHistoryResponse)(nil), // 4: history.GetPlayerHistoryResponse
+	(*StreamGameEventsRequest)(nil),  // 5: history.StreamGameEventsRequest
 }
 var file_pb_history_proto_depIdxs = []int32{
 	0, // 0: history.GetPlayerHistoryResponse.events:type_name -> history.GameEvent
 	1, // 1: history.HistoryService.RecordGameEvent:input_type -> history.RecordGameEventRequest
 	3, // 2: history.HistoryService.GetPlayerHistory:input_type -> history.GetPlayerHistoryRequest
-	2, // 3: history.HistoryService.RecordGameEvent:output_type -> history.RecordGameEventResponse
-	4, // 4: history.HistoryService.GetPlayerHistory:output_type -> history.GetPlayerHistoryResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
+	5, // 3: history.HistoryService.StreamGameEvents:input_type -> history.StreamGameEventsRequest
+	2, // 4: history.HistoryService.RecordGameEvent:output_type -> history.RecordGameEventResponse
+	4, // 5: history.HistoryService.GetPlayerHistory:output_type -> history.GetPlayerHistoryResponse
+	0, // 6: history.HistoryService.StreamGameEvents:output_type -> history.GameEvent
+	4, // [4:7] is the sub-list for method output_type
+	1, // [1:4] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -463,7 +514,7 @@ func file_pb_history_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pb_history_proto_rawDesc), len(file_pb_history_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
