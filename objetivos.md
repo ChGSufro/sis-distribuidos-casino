@@ -8,11 +8,11 @@
 - [x] Exponer métodos gRPC: `InitWallet`, `GetBalance`, `Deposit`, `Hold`, `Settle`, `Release`.
 - [x] Crear `Dockerfile` y configuración de PostgreSQL para Docker Compose.
 #### Blackjack Game Service (`bj_state_db` — MongoDB)
-- [ ] Configurar conexión y persistencia en MongoDB para la colección `hands`.
-- [ ] Implementar motor de Blackjack: valor de manos con Ases, split, double down, surrender y turno automático de la casa (dealer).
-- [ ] Implementar cliente gRPC hacia Wallet (`Hold`, `Settle`, `Release`) y History (`RecordGameEvent`).
-- [ ] Manejo de resiliencia ante caídas de Wallet o History (timeouts y estados cancelados).
-- [ ] Crear `Dockerfile` y configuración de MongoDB para Docker Compose.
+- [x] Configurar conexión y persistencia en MongoDB para la colección `hands`.
+- [x] Implementar motor de Blackjack: valor de manos con Ases, split, double down, surrender y turno automático de la casa (dealer).
+- [x] Implementar cliente gRPC hacia Wallet (`Hold`, `Settle`, `Release`) y History (`RecordGameEvent`).
+- [x] Manejo de resiliencia ante caídas de Wallet o History (timeouts y estados cancelados).
+- [x] Crear `Dockerfile` y configuración de MongoDB para Docker Compose.
 
 ---
 
