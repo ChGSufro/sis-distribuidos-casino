@@ -19,6 +19,7 @@ message GameEvent {
                           // "player_eliminated"
   string details     = 6; // JSON con el contenido variable segun la accion
   string timestamp   = 7; // Formato ISO 8601
+  string cursor      = 8; // ObjectId hex del documento en game_events (cursor del stream)
 }
 
 // ─────────────────────────────────────────────────────────

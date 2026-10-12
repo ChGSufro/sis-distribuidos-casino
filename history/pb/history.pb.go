@@ -33,6 +33,7 @@ type GameEvent struct {
 	// "player_eliminated"
 	Details       string `protobuf:"bytes,6,opt,name=details,proto3" json:"details,omitempty"`     // JSON con el contenido variable segun la accion
 	Timestamp     string `protobuf:"bytes,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Formato ISO 8601
+	Cursor        string `protobuf:"bytes,8,opt,name=cursor,proto3" json:"cursor,omitempty"`       // ObjectId hex del documento en game_events (cursor del stream)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -112,6 +113,13 @@ func (x *GameEvent) GetDetails() string {
 func (x *GameEvent) GetTimestamp() string {
 	if x != nil {
 		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *GameEvent) GetCursor() string {
+	if x != nil {
+		return x.Cursor
 	}
 	return ""
 }
@@ -431,7 +439,7 @@ var File_pb_history_proto protoreflect.FileDescriptor
 
 const file_pb_history_proto_rawDesc = "" +
 	"\n" +
-	"\x10pb/history.proto\x12\ahistory\"\xcc\x01\n" +
+	"\x10pb/history.proto\x12\ahistory\"\xe4\x01\n" +
 	"\tGameEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
@@ -439,7 +447,8 @@ const file_pb_history_proto_rawDesc = "" +
 	"\vgame_ref_id\x18\x04 \x01(\tR\tgameRefId\x12\x16\n" +
 	"\x06action\x18\x05 \x01(\tR\x06action\x12\x18\n" +
 	"\adetails\x18\x06 \x01(\tR\adetails\x12\x1c\n" +
-	"\ttimestamp\x18\a \x01(\tR\ttimestamp\"\xd9\x01\n" +
+	"\ttimestamp\x18\a \x01(\tR\ttimestamp\x12\x16\n" +
+	"\x06cursor\x18\b \x01(\tR\x06cursor\"\xd9\x01\n" +
 	"\x16RecordGameEventRequest\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
