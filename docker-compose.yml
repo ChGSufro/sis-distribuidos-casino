@@ -41,8 +41,52 @@ services:
     networks:
       - casino-net
 
+  bj_state_db:
+    image: mongo:7.0
+    container_name: bj_state_db
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${BJ_DB_USER:-casino_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${BJ_DB_PASSWORD:-casino_pass}
+      MONGO_INITDB_DATABASE: ${BJ_DB_NAME:-bj_state_db}
+    ports:
+      - "${BJ_DB_PORT:-27017}:27017"
+    volumes:
+      - bj_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "${BJ_DB_USER:-casino_user}", "-p", "${BJ_DB_PASSWORD:-casino_pass}", "--authenticationDatabase", "admin"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - casino-net
+
+  blackjack:
+    build:
+      context: .
+      dockerfile: blackjack/Dockerfile
+    container_name: blackjack
+    restart: unless-stopped
+    depends_on:
+      bj_state_db:
+        condition: service_healthy
+      wallet:
+        condition: service_started
+    environment:
+      PORT: ${BJ_PORT:-50052}
+      MONGO_URI: mongodb://${BJ_DB_USER:-casino_user}:${BJ_DB_PASSWORD:-casino_pass}@bj_state_db:27017/${BJ_DB_NAME:-bj_state_db}?authSource=admin
+      MONGO_DB_NAME: ${BJ_DB_NAME:-bj_state_db}
+      WALLET_SERVICE_URL: wallet:50051
+      HISTORY_SERVICE_URL: ${HISTORY_SERVICE_URL:-history:50053}
+    ports:
+      - "${BJ_PORT:-50052}:50052"
+    networks:
+      - casino-net
+
 volumes:
   wallet_pgdata:
+    driver: local
+  bj_mongo_data:
     driver: local
 
 networks:
