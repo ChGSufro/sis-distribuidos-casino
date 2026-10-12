@@ -1,0 +1,191 @@
+name: casino
+
+# Red interna: los servicios se comunican por nombre de servicio.
+# Solo el API Gateway publica puerto al host; el resto queda aislado.
+networks:
+  casino-net:
+    driver: bridge
+
+volumes:
+  users-pg-data:
+  wallet-pg-data:
+  mongo-poker-data:
+  mongo-blackjack-data:
+  mongo-history-data:
+  mongo-stats-data:
+
+services:
+  # =======================================================
+  # Bases de datos (Database-per-Service)
+  # =======================================================
+  postgres-users:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${USERS_DB_USER:-casino}
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:-casino}
+      POSTGRES_DB: ${USERS_DB_NAME:-users_db}
+    volumes:
+      - users-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USERS_DB_USER:-casino} -d ${USERS_DB_NAME:-users_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  postgres-wallet:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${WALLET_DB_USER:-casino}
+      POSTGRES_PASSWORD: ${WALLET_DB_PASSWORD:-casino}
+      POSTGRES_DB: ${WALLET_DB_NAME:-wallet_db}
+    volumes:
+      - wallet-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WALLET_DB_USER:-casino} -d ${WALLET_DB_NAME:-wallet_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  mongo-poker:
+    image: mongo:7
+    volumes:
+      - mongo-poker-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  mongo-blackjack:
+    image: mongo:7
+    volumes:
+      - mongo-blackjack-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  mongo-history:
+    image: mongo:7
+    volumes:
+      - mongo-history-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  mongo-stats:
+    image: mongo:7
+    volumes:
+      - mongo-stats-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [casino-net]
+
+  # =======================================================
+  # API Gateway (unico punto de entrada HTTP -> gRPC)
+  # =======================================================
+  gateway:
+    build: ./gateway
+    environment:
+      GATEWAY_PORT: ${GATEWAY_PORT:-8080}
+      USERS_ADDR: users:${USERS_GRPC_PORT:-50056}
+      WALLET_ADDR: wallet:${WALLET_GRPC_PORT:-50051}
+      BLACKJACK_ADDR: blackjack:${BLACKJACK_GRPC_PORT:-50052}
+      POKER_ADDR: poker:${POKER_GRPC_PORT:-50055}
+      HISTORY_ADDR: history:${HISTORY_GRPC_PORT:-50053}
+      STATS_ADDR: stats:${STATS_GRPC_PORT:-50054}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - users
+      - wallet
+      - blackjack
+      - poker
+      - history
+      - stats
+    networks: [casino-net]
+
+  # =======================================================
+  # Servicios de negocio
+  # =======================================================
+  users:
+    build: ./users
+    environment:
+      GRPC_PORT: ${USERS_GRPC_PORT:-50056}
+      DATABASE_URL: postgres://${USERS_DB_USER:-casino}:${USERS_DB_PASSWORD:-casino}@postgres-users:5432/${USERS_DB_NAME:-users_db}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      ACCESS_TTL: ${ACCESS_TTL:-15m}
+      REFRESH_TTL: ${REFRESH_TTL:-168h}
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    networks: [casino-net]
+
+  wallet:
+    build: ./wallet
+    environment:
+      GRPC_PORT: ${WALLET_GRPC_PORT:-50051}
+      DATABASE_URL: postgres://${WALLET_DB_USER:-casino}:${WALLET_DB_PASSWORD:-casino}@postgres-wallet:5432/${WALLET_DB_NAME:-wallet_db}?sslmode=disable
+    depends_on:
+      postgres-wallet:
+        condition: service_healthy
+    networks: [casino-net]
+
+  blackjack:
+    build: ./blackjack
+    environment:
+      GRPC_PORT: ${BLACKJACK_GRPC_PORT:-50052}
+      MONGO_URI: mongodb://mongo-blackjack:27017
+      MONGO_DB: ${MONGO_BLACKJACK_DB:-bj_state_db}
+      WALLET_ADDR: wallet:${WALLET_GRPC_PORT:-50051}
+      HISTORY_ADDR: history:${HISTORY_GRPC_PORT:-50053}
+    depends_on:
+      mongo-blackjack:
+        condition: service_healthy
+    networks: [casino-net]
+
+  poker:
+    build: ./poker
+    environment:
+      GRPC_PORT: ${POKER_GRPC_PORT:-50055}
+      MONGO_URI: mongodb://mongo-poker:27017
+      MONGO_DB: ${MONGO_POKER_DB:-poker_state_db}
+      HISTORY_ADDR: history:${HISTORY_GRPC_PORT:-50053}
+    depends_on:
+      mongo-poker:
+        condition: service_healthy
+    networks: [casino-net]
+
+  history:
+    build: ./history
+    environment:
+      GRPC_PORT: ${HISTORY_GRPC_PORT:-50053}
+      MONGO_URI: mongodb://mongo-history:27017
+      MONGO_DB: ${MONGO_HISTORY_DB:-audit_history_db}
+    depends_on:
+      mongo-history:
+        condition: service_healthy
+    networks: [casino-net]
+
+  stats:
+    build: ./stats
+    environment:
+      GRPC_PORT: ${STATS_GRPC_PORT:-50054}
+      MONGO_URI: mongodb://mongo-stats:27017
+      MONGO_DB: ${MONGO_STATS_DB:-stats_db}
+      HISTORY_ADDR: history:${HISTORY_GRPC_PORT:-50053}
+    depends_on:
+      mongo-stats:
+        condition: service_healthy
+    networks: [casino-net]
