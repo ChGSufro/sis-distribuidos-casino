@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package users;
+
+option go_package = "github.com/ChGSufro/sis-distribuidos-casino/users/pb";
+
+// ─────────────────────────────────────────────────────────
+// Mensajes de Solicitud y Respuesta
+// ─────────────────────────────────────────────────────────
+
+// Registro de un nuevo usuario.
+message RegisterRequest {
+  string username = 1;
+  string email    = 2;
+  string password = 3; // texto plano; se hashea con bcrypt en el servicio
+}
+
+message RegisterResponse {
+  string user_id    = 1; // UUID generado por el servicio
+  string username   = 2;
+  string email      = 3;
+  string created_at = 4; // Formato ISO 8601
+}
+
+// Inicio de sesion con credenciales.
+message LoginRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token  = 1; // JWT firmado para autenticar solicitudes
+  string refresh_token = 2; // token para renovar el access token
+  string expires_at    = 3; // Expiración del access token, ISO 8601
+  string user_id       = 4;
+  string username      = 5;
+  string status        = 6; // "active" | "inactive" | "banned"
+}
+
+// Validacion del access token, invocada por el API Gateway.
+message ValidateTokenRequest {
+  string access_token = 1;
+}
+
+message ValidateTokenResponse {
+  bool   valid    = 1; // true si el token es valido y no esta revocado
+  string user_id  = 2;
+  string username = 3;
+}
+
+// Renovacion del access token con rotacion del refresh token.
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token  = 1;
+  string refresh_token = 2;
+  string expires_at    = 3; // Formato ISO 8601
+}
+
+// Revocacion de la sesion asociada al access token.
+message LogoutRequest {
+  string access_token = 1;
+}
+
+message LogoutResponse {
+  bool success = 1;
+}
+
+// Consulta del perfil de un usuario.
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  string user_id       = 1;
+  string username      = 2;
+  string email         = 3;
+  string status        = 4; // "active" | "inactive" | "banned"
+  string created_at    = 5; // Formato ISO 8601
+  string last_login_at = 6; // Formato ISO 8601, vacio si nunca inicio sesion
+}
+
+// ─────────────────────────────────────────────────────────
+// Definición del Servicio gRPC
+// ─────────────────────────────────────────────────────────
+
+service UsersService {
+  rpc Register      (RegisterRequest)      returns (RegisterResponse);
+  rpc Login         (LoginRequest)         returns (LoginResponse);
+  rpc ValidateToken (ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc RefreshToken  (RefreshTokenRequest)  returns (RefreshTokenResponse);
+  rpc Logout        (LogoutRequest)        returns (LogoutResponse);
+  rpc GetProfile    (GetProfileRequest)    returns (GetProfileResponse);
+}

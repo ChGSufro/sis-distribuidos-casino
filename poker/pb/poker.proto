@@ -23,24 +23,39 @@ message Table {
   int64  big_blind_cents   = 4;
   int32  max_players       = 5; // 2..10
   int32  current_players   = 6; // jugadores sentados actualmente
-  string status            = 7; // "waiting", "active", "paused", "closed"
+  string status            = 7; // "waiting", "active", "closed"
 }
 
 // Jugador sentado en la mesa, sin informacion privada
 message Seat {
-  int32  seat_position = 1; // 1..max_players
+  int32  seat_position = 1; // 0..max_players-1
   string user_id       = 2;
   int64  stack_cents   = 3;
-  string status        = 4; // "active", "folded", "all_in", "sitting_out"
+  string status        = 4; // "active", "sitting_out", "left"
 }
 
 // Estado de un jugador dentro de la ronda en curso
 message PlayerState {
   string user_id                   = 1;
-  int32  seat_position             = 2;
+  int32  seat_position             = 2; // 0..max_players-1
   int64  stack_cents               = 3;
-  int64  total_bet_in_round_cents = 4;
+  int64  total_bet_in_round_cents  = 4;
   string status                    = 5; // "active", "folded", "all_in"
+}
+
+// Accion registrada por un jugador durante la ronda
+message Action {
+  string user_id      = 1;
+  string action       = 2; // "fold", "check", "call", "raise", "all-in"
+  int64  amount_cents = 3; // centavos apostados (0 para fold/check)
+  string timestamp    = 4; // ISO 8601
+}
+
+// Bote secundario generado por all-in. eligible_players son los
+// userId que pueden disputarlo.
+message SidePot {
+  int64           amount_cents     = 1;
+  repeated string eligible_players = 2;
 }
 
 // Ganador de un bote al cerrar la ronda
@@ -55,13 +70,16 @@ message Winner {
 // hasta el showdown.
 message RoundState {
   string         round_id          = 1;
-  string         stage             = 2; // "waiting", "preflop", "flop", "turn", "river", "settled"
+  string         stage             = 2;  // "waiting", "preflop", "flop", "turn", "river", "settled"
   repeated Card  community_cards   = 3;
   repeated Card  your_hole_cards   = 4;
-  int64          pot_size_cents    = 5;
-  int64          current_bet_cents = 6;
-  int32          current_turn      = 7; // seat_position del siguiente en actuar
-  string         turn_expires_at   = 8; // ISO 8601
+  int64          pot_size_cents    = 5;  // bote principal acumulado
+  int64          current_bet_cents = 6;  // apuesta a igualar en la ronda vigente
+  int32          current_turn      = 7;  // seat_position del siguiente en actuar
+  string         turn_expires_at   = 8;  // ISO 8601
+  int32          dealer_position   = 9;  // seat_position del dealer
+  repeated Action  actions         = 10; // acciones de la ronda en orden
+  repeated SidePot side_pots       = 11; // botes secundarios activos
 }
 
 // Difusion del estado de la mesa a todos los jugadores sentados
@@ -75,6 +93,9 @@ message TableUpdate {
   repeated PlayerState players         = 7;
   string             turn_expires_at   = 8; // ISO 8601
   repeated Winner    winners           = 9; // vacio mientras stage != "settled"
+  int32              dealer_position   = 10;
+  repeated Action    actions           = 11;
+  repeated SidePot   side_pots         = 12;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -83,7 +104,7 @@ message TableUpdate {
 
 // Listado de mesas, opcionalmente filtrado por estado
 message ListTablesRequest {
-  string status_filter = 1; // "waiting", "active", o vacio = todas
+  string status_filter = 1; // "waiting", "active", "closed", o vacio = todas
 }
 
 message ListTablesResponse {
@@ -109,12 +130,12 @@ message JoinTableRequest {
   string table_id            = 1;
   string user_id             = 2;
   int64  buy_in_amount_cents = 3; // > 0
-  int32  preferred_seat      = 4; // 0 = asignar el primer asiento libre
+  int32  preferred_seat      = 4; // -1 = asignar el primer asiento libre
 }
 
 message JoinTableResponse {
   string table_id      = 1;
-  int32  seat_position = 2;
+  int32  seat_position = 2; // 0..max_players-1
   int64  stack_cents   = 3; // fichas acreditadas en mesa
   string hold_id       = 4; // referencia a la reserva en Wallet
 }
