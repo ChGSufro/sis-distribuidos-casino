@@ -1,7 +1,7 @@
 name: casino
 
 # Red interna: los servicios se comunican por nombre de servicio.
-# Se excluyen temporalmente gateway, history y stats (correspondientes a otros hitos/integrantes).
+# Se excluye temporalmente el API Gateway (hito de integración).
 networks:
   casino-net:
     name: casino-net
@@ -17,6 +17,11 @@ volumes:
   users-pg-data:
     driver: local
   mongo-poker-data:
+    driver: local
+  # Volúmenes de Yoa (History & Stats)
+  mongo-history-data:
+    driver: local
+  mongo-stats-data:
     driver: local
 
 services:
@@ -96,6 +101,36 @@ services:
     restart: unless-stopped
     volumes:
       - mongo-poker-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - casino-net
+
+  # Base de datos MongoDB para History & Audit (Yoa)
+  mongo-history:
+    image: mongo:7
+    container_name: mongo-history
+    restart: unless-stopped
+    volumes:
+      - mongo-history-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - casino-net
+
+  # Base de datos MongoDB para Leaderboard & Stats (Yoa)
+  mongo-stats:
+    image: mongo:7
+    container_name: mongo-stats
+    restart: unless-stopped
+    volumes:
+      - mongo-stats-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -192,5 +227,48 @@ services:
     depends_on:
       mongo-poker:
         condition: service_healthy
+    networks:
+      - casino-net
+
+  # History & Audit Service (Yoa)
+  history:
+    build:
+      context: ./history
+      dockerfile: Dockerfile
+    container_name: history
+    restart: unless-stopped
+    environment:
+      GRPC_PORT: ${HISTORY_GRPC_PORT:-50053}
+      MONGO_URI: mongodb://mongo-history:27017
+      MONGO_DB: ${MONGO_HISTORY_DB:-audit_history_db}
+    ports:
+      - "${HISTORY_GRPC_PORT:-50053}:50053"
+    depends_on:
+      mongo-history:
+        condition: service_healthy
+    networks:
+      - casino-net
+
+  # Leaderboard & Stats Service (Yoa)
+  stats:
+    build:
+      context: ./stats
+      dockerfile: Dockerfile
+    container_name: stats
+    restart: unless-stopped
+    environment:
+      GRPC_PORT: ${STATS_GRPC_PORT:-50054}
+      MONGO_URI: mongodb://mongo-stats:27017
+      MONGO_DB: ${MONGO_STATS_DB:-stats_db}
+      HISTORY_ADDR: ${HISTORY_ADDR:-history:50053}
+      RECONNECT_INITIAL_MS: ${RECONNECT_INITIAL_MS:-1000}
+      RECONNECT_MAX_MS: ${RECONNECT_MAX_MS:-30000}
+    ports:
+      - "${STATS_GRPC_PORT:-50054}:50054"
+    depends_on:
+      mongo-stats:
+        condition: service_healthy
+      history:
+        condition: service_started
     networks:
       - casino-net
