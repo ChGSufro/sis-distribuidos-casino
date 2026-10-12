@@ -2,82 +2,86 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/clients"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/config"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/db"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/engine"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/handler"
 	pb "github.com/ChGSufro/sis-distribuidos-casino/blackjack/pb"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/repository"
+	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/service"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
-type server struct {
-	pb.UnimplementedBlackjackServiceServer
-}
-
-// CreateHand: crea una mano con datos simulados
-func (s *server) CreateHand(ctx context.Context, req *pb.CreateHandRequest) (*pb.CreateHandResponse, error) {
-	log.Printf("CreateHand recibido para user_id: %s, apuesta: %d centavos", req.GetUserId(), req.GetBetAmountCents())
-	return &pb.CreateHandResponse{
-		HandId: "hand-mock-101",
-		SubHands: []*pb.SubHand{
-			{
-				Index: 0,
-				Cards: []*pb.Card{
-					{Suit: "C", Rank: "A", Value: 11, Hidden: false},
-					{Suit: "S", Rank: "K", Value: 10, Hidden: false},
-				},
-				BetAmountCents: req.GetBetAmountCents(),
-				Status:         "active",
-				Result:         "",
-			},
-		},
-		DealerVisibleCard: &pb.Card{
-			Suit:   "D",
-			Rank:   "10",
-			Value:  10,
-			Hidden: false,
-		},
-		Status: "active",
-	}, nil
-}
-
-// GetHandState: retorna el estado actual de una mano simulada
-func (s *server) GetHandState(ctx context.Context, req *pb.GetHandStateRequest) (*pb.GetHandStateResponse, error) {
-	log.Printf("GetHandState solicitado para hand_id: %s, user_id: %s", req.GetHandId(), req.GetUserId())
-	return &pb.GetHandStateResponse{
-		HandId: req.GetHandId(),
-		SubHands: []*pb.SubHand{
-			{
-				Index: 0,
-				Cards: []*pb.Card{
-					{Suit: "C", Rank: "A", Value: 11, Hidden: false},
-					{Suit: "S", Rank: "K", Value: 10, Hidden: false},
-				},
-				BetAmountCents: 1000,
-				Status:         "blackjack",
-				Result:         "blackjack_win",
-			},
-		},
-		DealerCards: []*pb.Card{
-			{Suit: "D", Rank: "10", Value: 10, Hidden: false},
-			{Suit: "H", Rank: "9", Value: 9, Hidden: false},
-		},
-		Status:                 "settled",
-		TotalWinAmountCents:    2500,
-	}, nil
-}
-
 func main() {
-	port := ":50052"
-	lis, err := net.Listen("tcp", port)
+	log.Println("Iniciando Blackjack Game Service...")
+
+	cfg := config.Load()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 1. Conexión a MongoDB (bj_state_db)
+	mongoClient, database, err := db.Connect(ctx, cfg.MongoURI, cfg.MongoDBName)
 	if err != nil {
-		log.Fatalf("no se pudo escuchar en %s: %v", port, err)
+		log.Fatalf("Fallo crítico al conectar con MongoDB: %v", err)
+	}
+	defer func() {
+		_ = mongoClient.Disconnect(context.Background())
+	}()
+
+	// 2. Conexión gRPC cliente hacia WalletService
+	walletClient, err := clients.NewWalletClient(cfg.WalletServiceURL)
+	if err != nil {
+		log.Fatalf("Fallo crítico al inicializar cliente Wallet: %v", err)
+	}
+	defer walletClient.Close()
+
+	// 3. Conexión gRPC cliente hacia HistoryService (resiliente)
+	historyClient, err := clients.NewHistoryClient(cfg.HistoryServiceURL)
+	if err != nil {
+		log.Printf("Advertencia al inicializar cliente History: %v", err)
+	}
+	defer historyClient.Close()
+
+	// 4. Inyección de dependencias
+	repo := repository.NewMongoHandRepository(database)
+	gameEngine := engine.NewEngine()
+	gameService := service.NewBlackjackService(repo, gameEngine, walletClient, historyClient)
+	grpcHandler := handler.NewBlackjackGRPCHandler(gameService)
+
+	addr := fmt.Sprintf(":%s", cfg.Port)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("No se pudo escuchar en el puerto %s: %v", addr, err)
 	}
 
-	srv := grpc.NewServer()
-	pb.RegisterBlackjackServiceServer(srv, &server{})
+	grpcServer := grpc.NewServer()
+	pb.RegisterBlackjackServiceServer(grpcServer, grpcHandler)
+	reflection.Register(grpcServer)
 
-	log.Printf("Servidor Blackjack gRPC escuchando en %s", port)
-	if err := srv.Serve(lis); err != nil {
-		log.Fatalf("error al servir gRPC: %v", err)
-	}
+	// Manejo de señales para graceful shutdown
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Blackjack Game Service gRPC escuchando en %s", addr)
+		if err := grpcServer.Serve(lis); err != nil && err != grpc.ErrServerStopped {
+			log.Fatalf("Error en el servidor gRPC: %v", err)
+		}
+	}()
+
+	sig := <-stopChan
+	log.Printf("Señal de apagado recibida (%s). Deteniendo Blackjack Service...", sig)
+
+	grpcServer.GracefulStop()
+	log.Println("Blackjack Game Service detenido ordenadamente.")
 }
