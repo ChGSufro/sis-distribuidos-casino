@@ -1,4 +1,30 @@
+name: casino
+
+# Red interna: los servicios se comunican por nombre de servicio.
+# Se excluyen temporalmente gateway, history y stats (correspondientes a otros hitos/integrantes).
+networks:
+  casino-net:
+    name: casino-net
+    driver: bridge
+
+volumes:
+  # Volúmenes de Chris (Wallet & Blackjack)
+  wallet_pgdata:
+    driver: local
+  bj_mongo_data:
+    driver: local
+  # Volúmenes de Alex Sáez (Users & Poker)
+  users-pg-data:
+    driver: local
+  mongo-poker-data:
+    driver: local
+
 services:
+  # =======================================================
+  # Bases de datos (Database-per-Service)
+  # =======================================================
+
+  # Base de datos PostgreSQL para Wallet (Chris)
   wallet_db:
     image: postgres:16-alpine
     container_name: wallet_db
@@ -17,8 +43,72 @@ services:
       timeout: 3s
       retries: 5
     networks:
+      casino-net:
+        aliases:
+          - postgres-wallet
+
+  # Base de datos PostgreSQL para Users / Auth (Alex Sáez)
+  postgres-users:
+    image: postgres:16-alpine
+    container_name: postgres-users
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${USERS_DB_USER:-casino}
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:-casino}
+      POSTGRES_DB: ${USERS_DB_NAME:-users_db}
+    volumes:
+      - users-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USERS_DB_USER:-casino} -d ${USERS_DB_NAME:-users_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
       - casino-net
 
+  # Base de datos MongoDB para Blackjack State (Chris)
+  bj_state_db:
+    image: mongo:7.0
+    container_name: bj_state_db
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${BJ_DB_USER:-casino_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${BJ_DB_PASSWORD:-casino_pass}
+      MONGO_INITDB_DATABASE: ${BJ_DB_NAME:-bj_state_db}
+    ports:
+      - "${BJ_DB_PORT:-27017}:27017"
+    volumes:
+      - bj_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "${BJ_DB_USER:-casino_user}", "-p", "${BJ_DB_PASSWORD:-casino_pass}", "--authenticationDatabase", "admin"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      casino-net:
+        aliases:
+          - mongo-blackjack
+
+  # Base de datos MongoDB para Poker State (Alex Sáez)
+  mongo-poker:
+    image: mongo:7
+    container_name: mongo-poker
+    restart: unless-stopped
+    volumes:
+      - mongo-poker-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - casino-net
+
+  # =======================================================
+  # Servicios de negocio
+  # =======================================================
+
+  # Wallet Service (Chris)
   wallet:
     build:
       context: ./wallet
@@ -41,26 +131,7 @@ services:
     networks:
       - casino-net
 
-  bj_state_db:
-    image: mongo:7.0
-    container_name: bj_state_db
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${BJ_DB_USER:-casino_user}
-      MONGO_INITDB_ROOT_PASSWORD: ${BJ_DB_PASSWORD:-casino_pass}
-      MONGO_INITDB_DATABASE: ${BJ_DB_NAME:-bj_state_db}
-    ports:
-      - "${BJ_DB_PORT:-27017}:27017"
-    volumes:
-      - bj_mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "-u", "${BJ_DB_USER:-casino_user}", "-p", "${BJ_DB_PASSWORD:-casino_pass}", "--authenticationDatabase", "admin"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
-    networks:
-      - casino-net
-
+  # Blackjack Service (Chris)
   blackjack:
     build:
       context: .
@@ -83,13 +154,43 @@ services:
     networks:
       - casino-net
 
-volumes:
-  wallet_pgdata:
-    driver: local
-  bj_mongo_data:
-    driver: local
+  # Users & Auth Service (Alex Sáez)
+  users:
+    build:
+      context: ./users
+      dockerfile: Dockerfile
+    container_name: users
+    restart: unless-stopped
+    environment:
+      GRPC_PORT: ${USERS_GRPC_PORT:-50056}
+      DATABASE_URL: postgres://${USERS_DB_USER:-casino}:${USERS_DB_PASSWORD:-casino}@postgres-users:5432/${USERS_DB_NAME:-users_db}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      ACCESS_TTL: ${ACCESS_TTL:-15m}
+      REFRESH_TTL: ${REFRESH_TTL:-168h}
+    ports:
+      - "${USERS_GRPC_PORT:-50056}:50056"
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    networks:
+      - casino-net
 
-networks:
-  casino-net:
-    name: casino-net
-    driver: bridge
+  # Poker Service (Alex Sáez)
+  poker:
+    build:
+      context: ./poker
+      dockerfile: Dockerfile
+    container_name: poker
+    restart: unless-stopped
+    environment:
+      GRPC_PORT: ${POKER_GRPC_PORT:-50055}
+      MONGO_URI: mongodb://mongo-poker:27017
+      MONGO_DB: ${MONGO_POKER_DB:-poker_state_db}
+      HISTORY_ADDR: ${HISTORY_ADDR:-history:50053}
+    ports:
+      - "${POKER_GRPC_PORT:-50055}:50055"
+    depends_on:
+      mongo-poker:
+        condition: service_healthy
+    networks:
+      - casino-net
