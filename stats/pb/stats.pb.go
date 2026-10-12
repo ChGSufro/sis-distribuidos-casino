@@ -23,15 +23,17 @@ const (
 
 // Evento de juego emitido por History Service
 type GameEvent struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	EventId  string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`    // UUID del evento
-	UserId   string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`       // Identificador del jugador
-	GameType string                 `protobuf:"bytes,3,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"` // "blackjack" | "poker"
-	Action   string                 `protobuf:"bytes,4,opt,name=action,proto3" json:"action,omitempty"`                     // "hand_result" | "bet_placed" | "hand_cancelled" |
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	EventId   string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`         // UUID del evento
+	UserId    string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`            // Identificador del jugador
+	GameType  string                 `protobuf:"bytes,3,opt,name=game_type,json=gameType,proto3" json:"game_type,omitempty"`      // "blackjack" | "poker"
+	GameRefId string                 `protobuf:"bytes,4,opt,name=game_ref_id,json=gameRefId,proto3" json:"game_ref_id,omitempty"` // ObjectId hex de la mano o mesa
+	Action    string                 `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"`                          // "hand_result" | "bet_placed" | "hand_cancelled" |
 	// "table_result" | "player_buyin" | "player_payout" |
 	// "player_eliminated"
-	Details       string `protobuf:"bytes,5,opt,name=details,proto3" json:"details,omitempty"`     // JSON con el contenido variable segun la accion
-	Timestamp     string `protobuf:"bytes,6,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Formato ISO 8601
+	Details       string `protobuf:"bytes,6,opt,name=details,proto3" json:"details,omitempty"`     // JSON con el contenido variable segun la accion
+	Timestamp     string `protobuf:"bytes,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Formato ISO 8601
+	Cursor        string `protobuf:"bytes,8,opt,name=cursor,proto3" json:"cursor,omitempty"`       // ObjectId hex del documento en game_events (cursor del stream)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -87,6 +89,13 @@ func (x *GameEvent) GetGameType() string {
 	return ""
 }
 
+func (x *GameEvent) GetGameRefId() string {
+	if x != nil {
+		return x.GameRefId
+	}
+	return ""
+}
+
 func (x *GameEvent) GetAction() string {
 	if x != nil {
 		return x.Action
@@ -104,6 +113,13 @@ func (x *GameEvent) GetDetails() string {
 func (x *GameEvent) GetTimestamp() string {
 	if x != nil {
 		return x.Timestamp
+	}
+	return ""
+}
+
+func (x *GameEvent) GetCursor() string {
+	if x != nil {
+		return x.Cursor
 	}
 	return ""
 }
@@ -185,29 +201,28 @@ func (x *LeaderboardEntry) GetGamesPlayed() int32 {
 	return 0
 }
 
-// Confirmación del stream de eventos recibidos
-type StreamAck struct {
+// Espejo del StreamGameEventsRequest de History para el consumidor interno
+type StreamGameEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ReceivedCount int32                  `protobuf:"varint,1,opt,name=received_count,json=receivedCount,proto3" json:"received_count,omitempty"`
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // "received"
+	Cursor        string                 `protobuf:"bytes,1,opt,name=cursor,proto3" json:"cursor,omitempty"` // ObjectId hex del ultimo evento recibido; vacio = desde el inicio
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StreamAck) Reset() {
-	*x = StreamAck{}
+func (x *StreamGameEventsRequest) Reset() {
+	*x = StreamGameEventsRequest{}
 	mi := &file_pb_stats_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StreamAck) String() string {
+func (x *StreamGameEventsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StreamAck) ProtoMessage() {}
+func (*StreamGameEventsRequest) ProtoMessage() {}
 
-func (x *StreamAck) ProtoReflect() protoreflect.Message {
+func (x *StreamGameEventsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_pb_stats_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -219,21 +234,14 @@ func (x *StreamAck) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamAck.ProtoReflect.Descriptor instead.
-func (*StreamAck) Descriptor() ([]byte, []int) {
+// Deprecated: Use StreamGameEventsRequest.ProtoReflect.Descriptor instead.
+func (*StreamGameEventsRequest) Descriptor() ([]byte, []int) {
 	return file_pb_stats_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StreamAck) GetReceivedCount() int32 {
+func (x *StreamGameEventsRequest) GetCursor() string {
 	if x != nil {
-		return x.ReceivedCount
-	}
-	return 0
-}
-
-func (x *StreamAck) GetStatus() string {
-	if x != nil {
-		return x.Status
+		return x.Cursor
 	}
 	return ""
 }
@@ -666,24 +674,25 @@ var File_pb_stats_proto protoreflect.FileDescriptor
 
 const file_pb_stats_proto_rawDesc = "" +
 	"\n" +
-	"\x0epb/stats.proto\x12\x05stats\"\xac\x01\n" +
+	"\x0epb/stats.proto\x12\x05stats\"\xe4\x01\n" +
 	"\tGameEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1b\n" +
-	"\tgame_type\x18\x03 \x01(\tR\bgameType\x12\x16\n" +
-	"\x06action\x18\x04 \x01(\tR\x06action\x12\x18\n" +
-	"\adetails\x18\x05 \x01(\tR\adetails\x12\x1c\n" +
-	"\ttimestamp\x18\x06 \x01(\tR\ttimestamp\"\x9f\x01\n" +
+	"\tgame_type\x18\x03 \x01(\tR\bgameType\x12\x1e\n" +
+	"\vgame_ref_id\x18\x04 \x01(\tR\tgameRefId\x12\x16\n" +
+	"\x06action\x18\x05 \x01(\tR\x06action\x12\x18\n" +
+	"\adetails\x18\x06 \x01(\tR\adetails\x12\x1c\n" +
+	"\ttimestamp\x18\a \x01(\tR\ttimestamp\x12\x16\n" +
+	"\x06cursor\x18\b \x01(\tR\x06cursor\"\x9f\x01\n" +
 	"\x10LeaderboardEntry\x12\x12\n" +
 	"\x04rank\x18\x01 \x01(\x05R\x04rank\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12\x1f\n" +
 	"\vscore_cents\x18\x04 \x01(\x03R\n" +
 	"scoreCents\x12!\n" +
-	"\fgames_played\x18\x05 \x01(\x05R\vgamesPlayed\"J\n" +
-	"\tStreamAck\x12%\n" +
-	"\x0ereceived_count\x18\x01 \x01(\x05R\rreceivedCount\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\"0\n" +
+	"\fgames_played\x18\x05 \x01(\x05R\vgamesPlayed\"1\n" +
+	"\x17StreamGameEventsRequest\x12\x16\n" +
+	"\x06cursor\x18\x01 \x01(\tR\x06cursor\"0\n" +
 	"\x15GetPlayerStatsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x88\x03\n" +
 	"\x16GetPlayerStatsResponse\x12\x17\n" +
@@ -718,9 +727,8 @@ const file_pb_stats_proto_rawDesc = "" +
 	"\fperiod_start\x18\x02 \x01(\tR\vperiodStart\x121\n" +
 	"\aentries\x18\x03 \x03(\v2\x17.stats.LeaderboardEntryR\aentries\x12\x1f\n" +
 	"\vcomputed_at\x18\x04 \x01(\tR\n" +
-	"computedAt2\xc1\x02\n" +
-	"\fStatsService\x128\n" +
-	"\x10StreamGameEvents\x12\x10.stats.GameEvent\x1a\x10.stats.StreamAck(\x01\x12M\n" +
+	"computedAt2\x87\x02\n" +
+	"\fStatsService\x12M\n" +
 	"\x0eGetPlayerStats\x12\x1c.stats.GetPlayerStatsRequest\x1a\x1d.stats.GetPlayerStatsResponse\x12Y\n" +
 	"\x12GetPlayerGameStats\x12 .stats.GetPlayerGameStatsRequest\x1a!.stats.GetPlayerGameStatsResponse\x12M\n" +
 	"\x0eGetLeaderboard\x12\x1c.stats.GetLeaderboardRequest\x1a\x1d.stats.GetLeaderboardResponseB6Z4github.com/ChGSufro/sis-distribuidos-casino/stats/pbb\x06proto3"
@@ -741,7 +749,7 @@ var file_pb_stats_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_pb_stats_proto_goTypes = []any{
 	(*GameEvent)(nil),                  // 0: stats.GameEvent
 	(*LeaderboardEntry)(nil),           // 1: stats.LeaderboardEntry
-	(*StreamAck)(nil),                  // 2: stats.StreamAck
+	(*StreamGameEventsRequest)(nil),    // 2: stats.StreamGameEventsRequest
 	(*GetPlayerStatsRequest)(nil),      // 3: stats.GetPlayerStatsRequest
 	(*GetPlayerStatsResponse)(nil),     // 4: stats.GetPlayerStatsResponse
 	(*GetPlayerGameStatsRequest)(nil),  // 5: stats.GetPlayerGameStatsRequest
@@ -751,16 +759,14 @@ var file_pb_stats_proto_goTypes = []any{
 }
 var file_pb_stats_proto_depIdxs = []int32{
 	1, // 0: stats.GetLeaderboardResponse.entries:type_name -> stats.LeaderboardEntry
-	0, // 1: stats.StatsService.StreamGameEvents:input_type -> stats.GameEvent
-	3, // 2: stats.StatsService.GetPlayerStats:input_type -> stats.GetPlayerStatsRequest
-	5, // 3: stats.StatsService.GetPlayerGameStats:input_type -> stats.GetPlayerGameStatsRequest
-	7, // 4: stats.StatsService.GetLeaderboard:input_type -> stats.GetLeaderboardRequest
-	2, // 5: stats.StatsService.StreamGameEvents:output_type -> stats.StreamAck
-	4, // 6: stats.StatsService.GetPlayerStats:output_type -> stats.GetPlayerStatsResponse
-	6, // 7: stats.StatsService.GetPlayerGameStats:output_type -> stats.GetPlayerGameStatsResponse
-	8, // 8: stats.StatsService.GetLeaderboard:output_type -> stats.GetLeaderboardResponse
-	5, // [5:9] is the sub-list for method output_type
-	1, // [1:5] is the sub-list for method input_type
+	3, // 1: stats.StatsService.GetPlayerStats:input_type -> stats.GetPlayerStatsRequest
+	5, // 2: stats.StatsService.GetPlayerGameStats:input_type -> stats.GetPlayerGameStatsRequest
+	7, // 3: stats.StatsService.GetLeaderboard:input_type -> stats.GetLeaderboardRequest
+	4, // 4: stats.StatsService.GetPlayerStats:output_type -> stats.GetPlayerStatsResponse
+	6, // 5: stats.StatsService.GetPlayerGameStats:output_type -> stats.GetPlayerGameStatsResponse
+	8, // 6: stats.StatsService.GetLeaderboard:output_type -> stats.GetLeaderboardResponse
+	4, // [4:7] is the sub-list for method output_type
+	1, // [1:4] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name

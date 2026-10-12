@@ -10,14 +10,16 @@ option go_package = "github.com/ChGSufro/sis-distribuidos-casino/stats/pb";
 
 // Evento de juego emitido por History Service
 message GameEvent {
-  string event_id  = 1; // UUID del evento
-  string user_id   = 2; // Identificador del jugador
-  string game_type = 3; // "blackjack" | "poker"
-  string action    = 4; // "hand_result" | "bet_placed" | "hand_cancelled" |
-                        // "table_result" | "player_buyin" | "player_payout" |
-                        // "player_eliminated"
-  string details   = 5; // JSON con el contenido variable segun la accion
-  string timestamp = 6; // Formato ISO 8601
+  string event_id    = 1; // UUID del evento
+  string user_id     = 2; // Identificador del jugador
+  string game_type   = 3; // "blackjack" | "poker"
+  string game_ref_id = 4; // ObjectId hex de la mano o mesa
+  string action      = 5; // "hand_result" | "bet_placed" | "hand_cancelled" |
+                          // "table_result" | "player_buyin" | "player_payout" |
+                          // "player_eliminated"
+  string details     = 6; // JSON con el contenido variable segun la accion
+  string timestamp   = 7; // Formato ISO 8601
+  string cursor      = 8; // ObjectId hex del documento en game_events (cursor del stream)
 }
 
 // Entrada del ranking de un jugador
@@ -33,10 +35,9 @@ message LeaderboardEntry {
 // Mensajes de Solicitud y Respuesta
 // ─────────────────────────────────────────────────────────
 
-// Confirmación del stream de eventos recibidos
-message StreamAck {
-  int32  received_count = 1;
-  string status         = 2; // "received"
+// Espejo del StreamGameEventsRequest de History para el consumidor interno
+message StreamGameEventsRequest {
+  string cursor = 1; // ObjectId hex del ultimo evento recibido; vacio = desde el inicio
 }
 
 message GetPlayerStatsRequest {
@@ -88,7 +89,6 @@ message GetLeaderboardResponse {
 // ─────────────────────────────────────────────────────────
 
 service StatsService {
-  rpc StreamGameEvents   (stream GameEvent)          returns (StreamAck);
   rpc GetPlayerStats     (GetPlayerStatsRequest)      returns (GetPlayerStatsResponse);
   rpc GetPlayerGameStats (GetPlayerGameStatsRequest)  returns (GetPlayerGameStatsResponse);
   rpc GetLeaderboard     (GetLeaderboardRequest)      returns (GetLeaderboardResponse);

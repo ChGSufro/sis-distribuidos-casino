@@ -19,7 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StatsService_StreamGameEvents_FullMethodName   = "/stats.StatsService/StreamGameEvents"
 	StatsService_GetPlayerStats_FullMethodName     = "/stats.StatsService/GetPlayerStats"
 	StatsService_GetPlayerGameStats_FullMethodName = "/stats.StatsService/GetPlayerGameStats"
 	StatsService_GetLeaderboard_FullMethodName     = "/stats.StatsService/GetLeaderboard"
@@ -29,7 +28,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StatsServiceClient interface {
-	StreamGameEvents(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[GameEvent, StreamAck], error)
 	GetPlayerStats(ctx context.Context, in *GetPlayerStatsRequest, opts ...grpc.CallOption) (*GetPlayerStatsResponse, error)
 	GetPlayerGameStats(ctx context.Context, in *GetPlayerGameStatsRequest, opts ...grpc.CallOption) (*GetPlayerGameStatsResponse, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardResponse, error)
@@ -42,19 +40,6 @@ type statsServiceClient struct {
 func NewStatsServiceClient(cc grpc.ClientConnInterface) StatsServiceClient {
 	return &statsServiceClient{cc}
 }
-
-func (c *statsServiceClient) StreamGameEvents(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[GameEvent, StreamAck], error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &StatsService_ServiceDesc.Streams[0], StatsService_StreamGameEvents_FullMethodName, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &grpc.GenericClientStream[GameEvent, StreamAck]{ClientStream: stream}
-	return x, nil
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type StatsService_StreamGameEventsClient = grpc.ClientStreamingClient[GameEvent, StreamAck]
 
 func (c *statsServiceClient) GetPlayerStats(ctx context.Context, in *GetPlayerStatsRequest, opts ...grpc.CallOption) (*GetPlayerStatsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -90,7 +75,6 @@ func (c *statsServiceClient) GetLeaderboard(ctx context.Context, in *GetLeaderbo
 // All implementations must embed UnimplementedStatsServiceServer
 // for forward compatibility.
 type StatsServiceServer interface {
-	StreamGameEvents(grpc.ClientStreamingServer[GameEvent, StreamAck]) error
 	GetPlayerStats(context.Context, *GetPlayerStatsRequest) (*GetPlayerStatsResponse, error)
 	GetPlayerGameStats(context.Context, *GetPlayerGameStatsRequest) (*GetPlayerGameStatsResponse, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardResponse, error)
@@ -104,9 +88,6 @@ type StatsServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedStatsServiceServer struct{}
 
-func (UnimplementedStatsServiceServer) StreamGameEvents(grpc.ClientStreamingServer[GameEvent, StreamAck]) error {
-	return status.Error(codes.Unimplemented, "method StreamGameEvents not implemented")
-}
 func (UnimplementedStatsServiceServer) GetPlayerStats(context.Context, *GetPlayerStatsRequest) (*GetPlayerStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetPlayerStats not implemented")
 }
@@ -136,13 +117,6 @@ func RegisterStatsServiceServer(s grpc.ServiceRegistrar, srv StatsServiceServer)
 	}
 	s.RegisterService(&StatsService_ServiceDesc, srv)
 }
-
-func _StatsService_StreamGameEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(StatsServiceServer).StreamGameEvents(&grpc.GenericServerStream[GameEvent, StreamAck]{ServerStream: stream})
-}
-
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type StatsService_StreamGameEventsServer = grpc.ClientStreamingServer[GameEvent, StreamAck]
 
 func _StatsService_GetPlayerStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetPlayerStatsRequest)
@@ -218,12 +192,6 @@ var StatsService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _StatsService_GetLeaderboard_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "StreamGameEvents",
-			Handler:       _StatsService_StreamGameEvents_Handler,
-			ClientStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "pb/stats.proto",
 }
