@@ -2,59 +2,68 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/ChGSufro/sis-distribuidos-casino/wallet/config"
+	"github.com/ChGSufro/sis-distribuidos-casino/wallet/db"
+	"github.com/ChGSufro/sis-distribuidos-casino/wallet/handler"
 	pb "github.com/ChGSufro/sis-distribuidos-casino/wallet/pb"
+	"github.com/ChGSufro/sis-distribuidos-casino/wallet/repository"
+	"github.com/ChGSufro/sis-distribuidos-casino/wallet/service"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
-type server struct {
-	pb.UnimplementedWalletServiceServer
-}
-
-// GetBalance: implementacion minima con datos mockeados
-func (s *server) GetBalance(ctx context.Context, req *pb.GetBalanceRequest) (*pb.GetBalanceResponse, error) {
-	log.Printf("GetBalance solicitado para user_id: %s", req.GetUserId())
-	return &pb.GetBalanceResponse{
-		UserId:       req.GetUserId(),
-		BalanceCents: 100000, // 1000 creditos iniciales mockeados
-		UpdatedAt:    time.Now().Format(time.RFC3339),
-	}, nil
-}
-
-// Deposit: respuesta simulada incrementando saldo
-func (s *server) Deposit(ctx context.Context, req *pb.DepositRequest) (*pb.DepositResponse, error) {
-	log.Printf("Deposit recibido para user_id: %s, monto: %d centavos", req.GetUserId(), req.GetAmountCents())
-	return &pb.DepositResponse{
-		TransactionId:    "tx-mock-001",
-		NewBalanceCents: 100000 + req.GetAmountCents(),
-	}, nil
-}
-
-// Hold: reserva simulada de fondos para apuestas
-func (s *server) Hold(ctx context.Context, req *pb.HoldRequest) (*pb.HoldResponse, error) {
-	log.Printf("Hold solicitado para user_id: %s, monto: %d centavos, juego: %s", req.GetUserId(), req.GetAmountCents(), req.GetGameType())
-	return &pb.HoldResponse{
-		HoldId:      "hold-mock-777",
-		AmountCents: req.GetAmountCents(),
-		Status:      "active",
-	}, nil
-}
-
 func main() {
-	port := ":50051"
-	lis, err := net.Listen("tcp", port)
+	log.Println("Iniciando Wallet Service...")
+
+	cfg := config.Load()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Conectar a la base de datos PostgreSQL y aplicar migraciones
+	pool, err := db.Connect(ctx, cfg.DatabaseURL())
 	if err != nil {
-		log.Fatalf("no se pudo escuchar en %s: %v", port, err)
+		log.Fatalf("Fallo crítico al conectar con PostgreSQL: %v", err)
+	}
+	defer pool.Close()
+
+	// Inyección de dependencias
+	repo := repository.NewPostgresWalletRepository(pool)
+	svc := service.NewWalletService(repo)
+	grpcHandler := handler.NewWalletGRPCHandler(svc)
+
+	addr := fmt.Sprintf(":%s", cfg.Port)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("No se pudo escuchar en el puerto %s: %v", addr, err)
 	}
 
-	srv := grpc.NewServer()
-	pb.RegisterWalletServiceServer(srv, &server{})
+	grpcServer := grpc.NewServer()
+	pb.RegisterWalletServiceServer(grpcServer, grpcHandler)
+	reflection.Register(grpcServer) // Permite introspección con grpcurl
 
-	log.Printf("Servidor Wallet gRPC escuchando en %s", port)
-	if err := srv.Serve(lis); err != nil {
-		log.Fatalf("error al servir gRPC: %v", err)
-	}
+	// Canal para escuchar señales de terminación
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		log.Printf("Wallet Service gRPC escuchando en %s", addr)
+		if err := grpcServer.Serve(lis); err != nil && err != grpc.ErrServerStopped {
+			log.Fatalf("Error en el servidor gRPC: %v", err)
+		}
+	}()
+
+	// Esperar señal de apagado
+	sig := <-stopChan
+	log.Printf("Señal de apagado recibida (%s). Deteniendo servidor gRPC...", sig)
+
+	grpcServer.GracefulStop()
+	log.Println("Wallet Service detenido de forma ordenada.")
 }
