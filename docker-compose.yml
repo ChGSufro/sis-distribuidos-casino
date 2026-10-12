@@ -1,0 +1,51 @@
+services:
+  wallet_db:
+    image: postgres:16-alpine
+    container_name: wallet_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${WALLET_DB_USER:-casino_user}
+      POSTGRES_PASSWORD: ${WALLET_DB_PASSWORD:-casino_pass}
+      POSTGRES_DB: ${WALLET_DB_NAME:-wallet_db}
+    ports:
+      - "${WALLET_DB_PORT:-5434}:5432"
+    volumes:
+      - wallet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WALLET_DB_USER:-casino_user} -d ${WALLET_DB_NAME:-wallet_db}"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    networks:
+      - casino-net
+
+  wallet:
+    build:
+      context: ./wallet
+      dockerfile: Dockerfile
+    container_name: wallet
+    restart: unless-stopped
+    depends_on:
+      wallet_db:
+        condition: service_healthy
+    environment:
+      PORT: ${WALLET_PORT:-50051}
+      DB_HOST: wallet_db
+      DB_PORT: 5432
+      DB_USER: ${WALLET_DB_USER:-casino_user}
+      DB_PASSWORD: ${WALLET_DB_PASSWORD:-casino_pass}
+      DB_NAME: ${WALLET_DB_NAME:-wallet_db}
+      DB_SSLMODE: ${WALLET_DB_SSLMODE:-disable}
+    ports:
+      - "${WALLET_PORT:-50051}:50051"
+    networks:
+      - casino-net
+
+volumes:
+  wallet_pgdata:
+    driver: local
+
+networks:
+  casino-net:
+    name: casino-net
+    driver: bridge
