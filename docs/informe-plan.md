@@ -534,6 +534,17 @@ de manos o mesas.
   "largestWinCents": "Number (mayor ganancia individual en centavos)",
   "currentStreak": "Number (racha actual: positivo = victorias, negativo = derrotas)",
   "bestStreak": "Number (mejor racha histórica de victorias)",
+  "wins": "Number (total de victorias, base para winRate)",
+  "periods": "buckets incrementales por período (UTC) para el leaderboard exacto",
+  "periods.daily": {
+    "daily:YYYY-MM-DD": { "wageredCents": "Number", "wonCents": "Number", "games": "Number" }
+  },
+  "periods.weekly": {
+    "weekly:YYYY-Www": { "wageredCents": "Number", "wonCents": "Number", "games": "Number" }
+  },
+  "periods.monthly": {
+    "monthly:YYYY-MM": { "wageredCents": "Number", "wonCents": "Number", "games": "Number" }
+  },
   "lastUpdated": "ISODate"
 }
 ```
@@ -581,9 +592,17 @@ de manos o mesas.
 1. El History Service emite eventos por streaming gRPC al Stats Service.
 2. Stats Service actualiza incrementalmente `player_stats` y
    `player_game_stats` para cada evento recibido (nunca consulta
-   `audit_history_db` directamente).
-3. Periódicamente (cada hora/día/semana/mes) se calculan snapshots de
-   `rankings` ordenando por `netProfitCents` descendente.
+   `audit_history_db` directamente). Cada evento acumula también los
+   buckets de `periods` según el período (UTC) al que pertenece.
+3. El `GetLeaderboard` calcula el ranking exacto bajo demanda: `all_time`
+   ordena por `netProfitCents` de `player_stats`; `daily`, `weekly` y
+   `monthly` ordenan por (won − wagered) del bucket correspondiente. Tras
+   calcularlo, escribe un snapshot en `rankings`
+   (period, periodStart, entries, computedAt).
+
+Además, la colección interna `stream_state` (documento `_id:
+"history_stream"`) guarda el último `cursor` consumido del stream, de modo
+que la suscripción reanuda exactamente donde quedó tras reinicios o caídas.
 
 ---
 
@@ -1174,8 +1193,9 @@ Operaciones para gestionar mesas y jugar Póker. Es llamado por el **Gateway**
 #### 4.5 History & Audit Service
 
 Operaciones para registrar y consultar eventos de juego. Recibe escrituras
-de los servicios de juego y expone lecturas al Gateway. Emite un stream de
-eventos al Stats Service.
+de los servicios de juego y expone lecturas al Gateway. Además de los RPC
+unarios, el propio HistoryService expone el server-streaming
+`StreamGameEvents` para alimentar las estadísticas del Stats Service.
 
 ##### `RecordGameEvent`
 
@@ -1189,7 +1209,7 @@ eventos al Stats Service.
   "gameType": "String — 'blackjack' | 'poker'",
   "gameRefId": "String — hand._id (BJ) o rounds._id (Poker)",
   "action": "String — 'hand_result' | 'bet_placed' | 'hand_cancelled' | 'table_result' | 'player_buyin' | 'player_payout' | 'player_eliminated'",
-  "details": "Object — contenido variable según gameType y action (ver sección 3.5 para ejemplos)",
+  "details": "String — JSON serializado, contenido variable según gameType y action (ver sección 3.5 para ejemplos)",
   "timestamp": "ISODate"
 }
 ```
@@ -1210,7 +1230,7 @@ eventos al Stats Service.
 ```json
 {
   "userId": "UUID",
-  "gameType": "String | null — filtrar por 'blackjack' o 'poker' (null = todos)",
+  "gameType": "String — vacío = todos los juegos (en lugar de null)",
   "limit": "Number — cantidad máxima de eventos a devolver",
   "offset": "Number — desplazamiento para paginación"
 }
@@ -1222,44 +1242,74 @@ eventos al Stats Service.
   "events": [
     {
       "eventId": "UUID",
+      "userId": "UUID",
       "gameType": "String",
       "gameRefId": "String",
       "action": "String",
-      "details": "Object",
-      "timestamp": "ISODate"
+      "details": "String — JSON serializado",
+      "timestamp": "ISO 8601",
+      "cursor": "ObjectId hex del documento en game_events"
     }
   ],
   "totalCount": "Number — total de eventos que coinciden con los filtros"
 }
 ```
 
----
+##### `StreamGameEvents` _(server-streaming de HistoryService)_
 
-#### 4.6 Leaderboard & Stats Service
+**Flujo:** History Service → Stats Service _(el Stats se suscribe como
+cliente; el servidor emite eventos en vivo más catch-up desde el cursor)_
 
-Operaciones para consultar estadísticas y rankings. Recibe eventos del
-History Service mediante streaming continuo y expone datos agregados al
-Gateway.
+**Solicitud:**
+```json
+{
+  "cursor": "ObjectId hex del último evento recibido; vacío = desde el inicio"
+}
+```
 
-##### `StreamGameEvents` _(streaming continuo)_
-
-**Flujo:** History Service → Stats Service _(stream unidireccional: el History emite y el Stats consume)_
-
-**Cada evento del stream:**
+**Respuesta:** `stream` de eventos `GameEvent` (uno por mensaje):
 ```json
 {
   "eventId": "UUID",
   "userId": "UUID",
   "gameType": "String",
+  "gameRefId": "String",
   "action": "String",
-  "details": "Object",
-  "timestamp": "ISODate"
+  "details": "String — JSON serializado",
+  "timestamp": "ISO 8601",
+  "cursor": "ObjectId hex del documento en game_events (permite reanudar)"
 }
 ```
 
-El Stats Service procesa cada evento y actualiza incrementalmente
-`player_stats` y `player_game_stats`. No envía respuesta por evento
-individual (es un flujo de una sola dirección).
+El suscriptor se conecta al método `/history.HistoryService/StreamGameEvents`.
+Si provee un `cursor`, el servidor reenvía primero los eventos posteriores a
+ese cursor (catch-up) y luego sigue publicando los nuevos en vivo. Cada
+evento incluye su `cursor` para que el consumidor pueda persistirlo y
+reanudar sin pérdidas tras una desconexión.
+
+---
+
+#### 4.6 Leaderboard & Stats Service
+
+Operaciones para consultar estadísticas y rankings. Se suscribe al
+server-streaming `StreamGameEvents` del History Service y expone datos
+agregados al Gateway.
+
+##### Consumo del stream (cliente interno, no expuesto como RPC)
+
+`StreamGameEvents` no es un método de este servicio: el método vive en
+`HistoryService` (ver §4.5). Stats actúa como consumidor por detrás,
+conectándose a `/history.HistoryService/StreamGameEvents` con un cliente
+gRPC interno que:
+
+1. Reanuda desde el último `cursor` persistido en `stream_state` (o desde
+   el inicio en la primera ejecución).
+2. Procesa cada evento en orden FIFO y actualiza incrementalmente
+   `player_stats` y `player_game_stats` (escritor único → sin conflictos).
+3. Persiste el `cursor` del evento solo tras procesarlo con éxito; ante una
+   caída de History o de Mongo reconecta con backoff exponencial
+   (1s → 30s), por lo que nunca pierde eventos ni deja de servir las
+   consultas gRPC.
 
 ##### `GetPlayerStats`
 
