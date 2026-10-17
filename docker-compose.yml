@@ -1,7 +1,7 @@
 name: casino
 
 # Red interna: los servicios se comunican por nombre de servicio.
-# Se excluye temporalmente el API Gateway (hito de integración).
+# El API Gateway es el punto de entrada único HTTP/REST hacia el perímetro interno.
 networks:
   casino-net:
     name: casino-net
@@ -269,6 +269,42 @@ services:
       mongo-stats:
         condition: service_healthy
       history:
+        condition: service_started
+    networks:
+      - casino-net
+
+  # =======================================================
+  # API Gateway (Punto de entrada único HTTP/REST -> gRPC)
+  # =======================================================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    restart: unless-stopped
+    environment:
+      HTTP_PORT: ${GATEWAY_PORT:-8080}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      USERS_ADDR: users:${USERS_GRPC_PORT:-50056}
+      WALLET_ADDR: wallet:${WALLET_PORT:-50051}
+      BJ_ADDR: blackjack:${BJ_PORT:-50052}
+      POKER_ADDR: poker:${POKER_GRPC_PORT:-50055}
+      HISTORY_ADDR: history:${HISTORY_GRPC_PORT:-50053}
+      STATS_ADDR: stats:${STATS_GRPC_PORT:-50054}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      users:
+        condition: service_started
+      wallet:
+        condition: service_started
+      blackjack:
+        condition: service_started
+      poker:
+        condition: service_started
+      history:
+        condition: service_started
+      stats:
         condition: service_started
     networks:
       - casino-net
