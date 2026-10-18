@@ -241,3 +241,178 @@ th {
   color: var(--text-dim);
   font-weight: 600;
 }
+
+.top-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.balance-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.balance-box .label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.balance {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-form input {
+  width: 150px;
+}
+
+.table-card {
+  margin-top: 8px;
+}
+
+.table-zone {
+  padding: 16px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.table-zone h3 {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.card-tile {
+  width: 58px;
+  height: 82px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f4f5f7;
+  font-weight: 700;
+}
+
+.card-tile.red {
+  color: #c0392b;
+}
+
+.card-tile.black {
+  color: #1b1d22;
+}
+
+.card-rank {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.card-suit {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.card-back {
+  background: repeating-linear-gradient(
+    45deg,
+    #2b2f3a,
+    #2b2f3a 6px,
+    #22262f 6px,
+    #22262f 12px
+  );
+  border-color: var(--accent);
+}
+
+.player-hands {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.subhand {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+}
+
+.subhand.selected {
+  border-color: var(--accent);
+}
+
+.subhand-header {
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+
+.subhand-header .status {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.result {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.result.win,
+.result.blackjack_win {
+  color: var(--success);
+}
+
+.result.lose,
+.result.surrender {
+  color: var(--danger);
+}
+
+.hand-total {
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.subhand-selector {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.subhand-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.controls {
+  margin: 16px 0;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--text-dim);
+}
