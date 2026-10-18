@@ -2,6 +2,19 @@ let period = "all_time";
 
 const GAMES = ["blackjack", "poker"];
 const GAME_LABELS = { blackjack: "Blackjack", poker: "Póker" };
+const usernameCache = {};
+
+async function fetchUsername(userId) {
+  if (!userId) return null;
+  if (usernameCache[userId] !== undefined) return usernameCache[userId];
+  try {
+    const data = await apiGet("/api/users/" + encodeURIComponent(userId) + "/profile");
+    usernameCache[userId] = data.username || null;
+  } catch (error) {
+    usernameCache[userId] = null;
+  }
+  return usernameCache[userId];
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -110,10 +123,15 @@ async function loadLeaderboard() {
       tbody.innerHTML = '<tr><td colspan="4" class="muted">Sin datos para este periodo.</td></tr>';
       return;
     }
+    const missing = entries
+      .filter((entry) => !entry.username && entry.user_id)
+      .map((entry) => entry.user_id);
+    await Promise.all(missing.map((userId) => fetchUsername(userId)));
     tbody.innerHTML = entries
       .map((entry) => {
         const name =
           entry.username ||
+          (entry.user_id ? usernameCache[entry.user_id] : null) ||
           (entry.user_id ? String(entry.user_id).slice(0, 8) + "…" : "—");
         return (
           "<tr><td>" + escapeHtml(String(entry.rank || "")) + "</td>" +
