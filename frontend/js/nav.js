@@ -22,7 +22,7 @@ function renderNav(active) {
 
   const username = localStorage.getItem("username") || "";
   const links = [
-    { href: "game.html", label: "Jugar" },
+    { href: "game.html", label: "Blackjack" },
     { href: "poker.html", label: "Póker" },
     { href: "history.html", label: "Historial" },
     { href: "stats.html", label: "Estadísticas" },
