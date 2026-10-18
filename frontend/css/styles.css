@@ -416,3 +416,74 @@ th {
 .muted {
   color: var(--text-dim);
 }
+
+.toolbar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.field {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 0;
+}
+
+.field select {
+  margin-top: 6px;
+  padding: 9px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.details {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  max-width: 380px;
+}
+
+.detail-summary,
+.detail-hands {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.detail-summary span,
+.detail-hands span {
+  white-space: nowrap;
+}
+
+.detail-cards summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.82rem;
+}
+
+.detail-cards div {
+  margin-top: 4px;
+  color: var(--text);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}

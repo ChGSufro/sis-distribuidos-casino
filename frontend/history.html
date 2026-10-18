@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Historial</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header id="app-nav"></header>
+
+  <main class="container">
+    <h1>Historial</h1>
+
+    <section class="card">
+      <div class="toolbar">
+        <label class="field">Juego
+          <select id="game-filter">
+            <option value="">Todos</option>
+            <option value="blackjack">Blackjack</option>
+            <option value="poker">Póker</option>
+          </select>
+        </label>
+        <label class="field">Por página
+          <select id="limit-select">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+      </div>
+
+      <p id="history-message" class="message"></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Juego</th>
+              <th>Acción</th>
+              <th>Detalles</th>
+            </tr>
+          </thead>
+          <tbody id="history-rows"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <button id="prev-btn" class="btn" type="button">Anterior</button>
+        <span id="page-info" class="muted"></span>
+        <button id="next-btn" class="btn" type="button">Siguiente</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/history.js"></script>
+</body>
+</html>
