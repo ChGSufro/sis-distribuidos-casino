@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Estadísticas</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header id="app-nav"></header>
+
+  <main class="container">
+    <h1>Estadísticas</h1>
+    <p id="stats-message" class="message"></p>
+
+    <section class="card">
+      <h2>Resumen</h2>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Total apostado</span>
+          <span id="stat-wagered" class="stat-value">$0.00</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total ganado</span>
+          <span id="stat-won" class="stat-value">$0.00</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Beneficio neto</span>
+          <span id="stat-net" class="stat-value neutral">$0.00</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Partidas jugadas</span>
+          <span id="stat-games" class="stat-value">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Win rate</span>
+          <span id="stat-winrate" class="stat-value">0.0%</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Mayor premio</span>
+          <span id="stat-largest" class="stat-value">$0.00</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Racha actual</span>
+          <span id="stat-streak" class="stat-value neutral">—</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Mejor racha</span>
+          <span id="stat-best" class="stat-value">0</span>
+        </div>
+      </div>
+      <p class="muted">Última actualización: <span id="stat-updated">—</span></p>
+    </section>
+
+    <section class="card">
+      <h2>Por juego</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Juego</th>
+              <th>Partidas</th>
+              <th>Apostado</th>
+              <th>Ganado</th>
+              <th>Mayor premio</th>
+            </tr>
+          </thead>
+          <tbody id="game-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Leaderboard</h2>
+      <div class="toolbar">
+        <label class="field">Periodo
+          <select id="period-select">
+            <option value="all_time" selected>Total histórico</option>
+            <option value="daily">Hoy</option>
+            <option value="weekly">Esta semana</option>
+            <option value="monthly">Este mes</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jugador</th>
+              <th>Puntos</th>
+              <th>Partidas</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/stats.js"></script>
+</body>
+</html>
