@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Blackjack</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header id="app-nav"></header>
+
+  <main class="container">
+    <div class="top-bar">
+      <div class="balance-box">
+        <span class="label">Saldo</span>
+        <span id="balance" class="balance">$0.00</span>
+      </div>
+      <form id="deposit-form" class="inline-form">
+        <input type="number" name="amount" min="1" step="1" placeholder="Monto ($)" required>
+        <button type="submit" class="btn">Depositar</button>
+      </form>
+    </div>
+
+    <p id="game-message" class="message"></p>
+
+    <section class="card table-card">
+      <div class="table-zone">
+        <h3>Dealer</h3>
+        <div id="dealer-cards" class="cards"></div>
+        <div id="dealer-total" class="hand-total"></div>
+      </div>
+
+      <div class="table-zone">
+        <h3>Jugador</h3>
+        <div id="player-hands" class="player-hands"></div>
+      </div>
+
+      <div id="subhand-selector" class="subhand-selector"></div>
+
+      <div class="controls">
+        <form id="bet-form" class="inline-form">
+          <input type="number" name="bet" min="1" step="1" placeholder="Apuesta ($)" required>
+          <button type="submit" class="btn">Nueva mano</button>
+        </form>
+      </div>
+
+      <div id="actions" class="actions">
+        <button class="btn" data-action="hit">Hit</button>
+        <button class="btn" data-action="stand">Stand</button>
+        <button class="btn" data-action="double">Double</button>
+        <button class="btn" data-action="split">Split</button>
+        <button class="btn" data-action="surrender">Surrender</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
