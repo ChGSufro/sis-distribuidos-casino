@@ -128,13 +128,20 @@ func (s *blackjackService) PlayerAction(ctx context.Context, handID, userID stri
 		}
 
 		doubleIdempKey := fmt.Sprintf("bj-dbl-%s", uuid.New().String())
-		_, errHold := s.walletClient.Hold(ctx, userID, subHandBet, handID, doubleIdempKey)
+		doubleHoldID, errHold := s.walletClient.Hold(ctx, userID, subHandBet, handID, doubleIdempKey)
 		if errHold != nil {
 			return nil, fmt.Errorf("wallet hold adicional para double: %w", errHold)
 		}
 
 		if err := s.engine.Double(hand, subHandIndex, s.deck); err != nil {
 			return nil, err
+		}
+
+		for i := range hand.SubHands {
+			if hand.SubHands[i].Index == subHandIndex {
+				hand.SubHands[i].DoubleHoldID = doubleHoldID
+				break
+			}
 		}
 
 	case domain.ActionSplit:
@@ -192,6 +199,9 @@ func (s *blackjackService) GetHandState(ctx context.Context, handID, userID stri
 }
 
 func (s *blackjackService) settleHandFinancesAndAudit(ctx context.Context, hand *domain.HandDocument) {
+	var totalBetCents int64
+	var totalWinCents int64
+
 	for i := range hand.SubHands {
 		sh := &hand.SubHands[i]
 		var winAmount int64 = 0
@@ -209,18 +219,47 @@ func (s *blackjackService) settleHandFinancesAndAudit(ctx context.Context, hand 
 			winAmount = 0
 		}
 
-		err := s.walletClient.Settle(ctx, sh.HoldID, winAmount)
-		if err != nil {
-			log.Printf("[ALERTA] Fallo al liquidar HoldID %s en Wallet: %v", sh.HoldID, err)
+		totalBetCents += sh.BetAmountCents
+		totalWinCents += winAmount
+
+		if sh.DoubleHoldID != "" {
+			halfWin := winAmount / 2
+			otherHalf := winAmount - halfWin
+
+			if err := s.walletClient.Settle(ctx, sh.HoldID, halfWin); err != nil {
+				log.Printf("[ALERTA] Fallo al liquidar HoldID %s en Wallet: %v", sh.HoldID, err)
+			}
+			if err := s.walletClient.Settle(ctx, sh.DoubleHoldID, otherHalf); err != nil {
+				log.Printf("[ALERTA] Fallo al liquidar DoubleHoldID %s en Wallet: %v", sh.DoubleHoldID, err)
+			}
+		} else {
+			if err := s.walletClient.Settle(ctx, sh.HoldID, winAmount); err != nil {
+				log.Printf("[ALERTA] Fallo al liquidar HoldID %s en Wallet: %v", sh.HoldID, err)
+			}
 		}
 	}
 
-	// Registrar evento en HistoryService
+	var consolidatedResult string
+	if len(hand.SubHands) == 1 {
+		consolidatedResult = string(hand.SubHands[0].Result)
+	} else {
+		if totalWinCents > totalBetCents {
+			consolidatedResult = string(domain.ResultWin)
+		} else if totalWinCents < totalBetCents {
+			consolidatedResult = string(domain.ResultLose)
+		} else {
+			consolidatedResult = string(domain.ResultPush)
+		}
+	}
+
 	detailsMap := map[string]interface{}{
-		"subHands":    hand.SubHands,
-		"dealerCards": hand.DealerCards,
-		"totalWin":    hand.TotalWinAmountCents,
-		"status":      hand.Status,
+		"betAmountCents": totalBetCents,
+		"winAmountCents": totalWinCents,
+		"result":         consolidatedResult,
+		"subHands":       hand.SubHands,
+		"dealerCards":    hand.DealerCards,
+		"totalWin":       totalWinCents,
+		"status":         hand.Status,
 	}
 	detailsBytes, _ := json.Marshal(detailsMap)
 	eventID := uuid.New().String()
