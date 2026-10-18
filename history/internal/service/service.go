@@ -132,5 +132,6 @@ func toProto(rec *store.EventRecord) *historypb.GameEvent {
 		Action:    rec.Action,
 		Details:   rec.Details,
 		Timestamp: rec.Timestamp.UTC().Format(time.RFC3339),
+		Cursor:    rec.ID.Hex(),
 	}
 }

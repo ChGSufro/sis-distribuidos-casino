@@ -26,11 +26,15 @@ type EventRecord struct {
 // InsertEvent inserta un evento (append-only). Si ya existe un evento con el
 // mismo eventId devuelve exists=true sin duplicar el documento (idempotencia).
 func (s *MongoStore) InsertEvent(ctx context.Context, ev *EventRecord) (exists bool, err error) {
-	if _, err := s.db.Collection(EventsCollection).InsertOne(ctx, ev); err != nil {
+	res, err := s.db.Collection(EventsCollection).InsertOne(ctx, ev)
+	if err != nil {
 		if mongo.IsDuplicateKeyError(err) {
 			return true, nil
 		}
 		return false, fmt.Errorf("insert event: %w", err)
+	}
+	if oid, ok := res.InsertedID.(primitive.ObjectID); ok {
+		ev.ID = oid
 	}
 	return false, nil
 }
