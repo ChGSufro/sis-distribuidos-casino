@@ -53,6 +53,7 @@ type SubHand struct {
 	Cards          []Card        `bson:"cards" json:"cards"`
 	BetAmountCents int64         `bson:"betAmountCents" json:"bet_amount_cents"`
 	HoldID         string        `bson:"holdId" json:"hold_id"`
+	DoubleHoldID   string        `bson:"doubleHoldId,omitempty" json:"double_hold_id,omitempty"`
 	Status         SubHandStatus `bson:"status" json:"status"`
 	Result         HandResult    `bson:"result,omitempty" json:"result,omitempty"`
 }

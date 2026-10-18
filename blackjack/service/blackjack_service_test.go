@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/ChGSufro/sis-distribuidos-casino/blackjack/domain"
@@ -82,11 +83,16 @@ func (m *mockWalletClient) Close() error {
 }
 
 type mockHistoryClient struct {
-	events []string
+	events          []string
+	recordedDetails []map[string]any
 }
 
 func (m *mockHistoryClient) RecordGameEvent(ctx context.Context, eventID, userID, gameRefID, action, detailsJSON string) error {
 	m.events = append(m.events, action)
+	var details map[string]any
+	if err := json.Unmarshal([]byte(detailsJSON), &details); err == nil {
+		m.recordedDetails = append(m.recordedDetails, details)
+	}
 	return nil
 }
 
@@ -167,6 +173,72 @@ func TestBlackjackServiceValidations(t *testing.T) {
 	_, err = svc.CreateHand(ctx, uuid.New().String(), 0)
 	if err != domain.ErrInvalidBetAmount {
 		t.Fatalf("expected ErrInvalidBetAmount, got %v", err)
+	}
+}
+
+func TestBlackjackServiceDoubleAndStatsDetails(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockHandRepo()
+	wallet := newMockWalletClient()
+	history := &mockHistoryClient{}
+	eng := engine.NewEngine()
+
+	svc := service.NewBlackjackService(repo, eng, wallet, history)
+	userID := uuid.New().String()
+
+	hand, err := svc.CreateHand(ctx, userID, 1000)
+	if err != nil {
+		t.Fatalf("CreateHand failed: %v", err)
+	}
+
+	// Prepare cards for double
+	hand.Status = domain.HandStatusActive
+	hand.SubHands[0].Status = domain.SubHandStatusActive
+	hand.SubHands[0].Cards = []domain.Card{
+		{Suit: "hearts", Rank: "5", Value: 5},
+		{Suit: "diamonds", Rank: "6", Value: 6},
+	}
+	hand.DealerCards = []domain.Card{
+		{Suit: "spades", Rank: "10", Value: 10},
+	}
+	_ = repo.UpdateHand(ctx, hand)
+
+	initialHoldID := hand.SubHands[0].HoldID
+	if initialHoldID == "" {
+		t.Fatalf("expected initial hold ID")
+	}
+
+	settledHand, err := svc.PlayerAction(ctx, hand.ID.Hex(), userID, 0, "double")
+	if err != nil {
+		t.Fatalf("PlayerAction double failed: %v", err)
+	}
+
+	doubleHoldID := settledHand.SubHands[0].DoubleHoldID
+	if doubleHoldID == "" {
+		t.Fatalf("expected doubleHoldID to be set on subhand")
+	}
+
+	// Verify both holds were settled
+	if _, ok := wallet.settles[initialHoldID]; !ok {
+		t.Fatalf("expected initial hold %s to be settled", initialHoldID)
+	}
+	if _, ok := wallet.settles[doubleHoldID]; !ok {
+		t.Fatalf("expected double hold %s to be settled", doubleHoldID)
+	}
+
+	// Verify history event was recorded with flat details
+	if len(history.recordedDetails) == 0 {
+		t.Fatalf("expected history details to be recorded")
+	}
+	lastDetails := history.recordedDetails[len(history.recordedDetails)-1]
+	if _, ok := lastDetails["betAmountCents"]; !ok {
+		t.Fatalf("expected betAmountCents in history details")
+	}
+	if _, ok := lastDetails["winAmountCents"]; !ok {
+		t.Fatalf("expected winAmountCents in history details")
+	}
+	if _, ok := lastDetails["result"]; !ok {
+		t.Fatalf("expected result in history details")
 	}
 }
 
