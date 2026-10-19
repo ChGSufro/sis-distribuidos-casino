@@ -7,9 +7,9 @@ const ACTION_LABELS = {
   bet_placed: "Apuesta",
   hand_result: "Resultado",
   hand_cancelled: "Mano cancelada",
-  table_result: "Resultado de mesa",
-  player_buyin: "Entrada a mesa",
-  player_payout: "Pago",
+  table_result: "Mano de póker",
+  player_buyin: "Compra de fichas",
+  player_payout: "Cobro al salir",
   player_eliminated: "Eliminado",
 };
 
@@ -68,7 +68,8 @@ function parseDetails(raw) {
 function formatDetailValue(key, value) {
   if (value === null || value === undefined) return String(value);
   if (typeof value === "object") return JSON.stringify(value);
-  if (key.indexOf("_cents") !== -1 && typeof value === "number") {
+  const isCentsKey = key.indexOf("_cents") !== -1 || /Cents$/.test(key);
+  if (isCentsKey && typeof value === "number") {
     return formatCents(value);
   }
   return String(value);

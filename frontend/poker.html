@@ -20,9 +20,13 @@
         <input type="number" name="smallBlind" min="0.01" step="0.01" placeholder="Ciega menor ($)" required>
         <input type="number" name="bigBlind" min="0.02" step="0.01" placeholder="Ciega mayor ($)" required>
         <input type="number" name="maxPlayers" min="2" max="10" step="1" value="6" required>
+        <input type="number" name="buyIn" min="0" step="0.01" placeholder="Buy-in opcional ($)">
         <button type="submit" class="btn">Crear</button>
       </form>
-      <p class="muted">Las fichas son simuladas (sin saldo real).</p>
+      <p class="muted">
+        Si indicas buy-in, la mesa se crea y te sienta de una (fichas reales de wallet).
+        Déjalo vacío para solo crear la mesa y unirte luego con "Unirse".
+      </p>
     </section>
 
     <section class="card">

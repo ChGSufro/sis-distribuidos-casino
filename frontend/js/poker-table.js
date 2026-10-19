@@ -17,6 +17,7 @@ let seats = [];
 let currentRound = null;
 let playersBySeat = {};
 let winners = [];
+let reveals = [];
 let actionInFlight = false;
 let pollTimer = null;
 let tickTimer = null;
@@ -39,6 +40,10 @@ function shortUser(userId) {
   if (!userId) return "—";
   const id = String(userId);
   return id.length > 10 ? id.slice(0, 8) + "…" : id;
+}
+
+function displayName(userId, username) {
+  return username || shortUser(userId);
 }
 
 function dollarsToCents(value) {
@@ -138,11 +143,12 @@ function renderSeats() {
 
     if (occupied) {
       const stack = player && player.stack_cents !== undefined ? player.stack_cents : seat.stack_cents;
-      const displayName = isMe
-        ? localStorage.getItem("username") || shortUser(seat.user_id)
-        : shortUser(seat.user_id);
+      const seatName = seat.username || (player && player.username) || "";
+      const playerName = isMe
+        ? localStorage.getItem("username") || displayName(seat.user_id, seatName)
+        : displayName(seat.user_id, seatName);
       inner +=
-        '<div class="seat-user">' + escapeHtml(displayName) + "</div>" +
+        '<div class="seat-user">' + escapeHtml(playerName) + "</div>" +
         '<div class="seat-stack">' + formatCents(stack || 0) + "</div>";
       if (player && player.total_bet_in_round_cents) {
         inner += '<div class="seat-bet">Apostado ' + formatCents(player.total_bet_in_round_cents) + "</div>";
@@ -167,13 +173,16 @@ function renderWinners() {
   banner.innerHTML =
     "<strong>Ganadores:</strong> " +
     winners
-      .map(
-        (winner) =>
-          escapeHtml(shortUser(winner.user_id)) +
+      .map((winner) => {
+        const seat = (seats || []).find((s) => s.user_id === winner.user_id);
+        const name = displayName(winner.user_id, seat && seat.username);
+        return (
+          escapeHtml(name) +
           " +" +
           escapeHtml(formatCents(winner.amount_cents || 0)) +
           (winner.pot_type && winner.pot_type !== "main" ? " (" + escapeHtml(winner.pot_type) + ")" : "")
-      )
+        );
+      })
       .join(" · ");
 }
 
@@ -184,13 +193,40 @@ function renderTurnLabel() {
     return;
   }
   const seat = (seats || []).find((s) => s.seat_position === currentRound.current_turn);
-  const who = seat && seat.user_id === myUserId() ? "Tu turno" : "Turno de " + shortUser(seat ? seat.user_id : "");
+  const seatName = seat ? displayName(seat.user_id, seat.username) : "";
+  const who = seat && seat.user_id === myUserId() ? "Tu turno" : "Turno de " + seatName;
   let countdown = "";
   if (currentRound.turn_expires_at) {
     const remaining = Math.max(0, Math.floor((new Date(currentRound.turn_expires_at) - Date.now()) / 1000));
     countdown = " (" + remaining + "s)";
   }
   element.textContent = who + countdown;
+}
+
+function renderReveals() {
+  const container = document.getElementById("reveals-section");
+  if (!container) return;
+  const showdownStage = currentRound && (currentRound.stage === "showdown" || currentRound.stage === "settled");
+  if (!reveals.length || !showdownStage) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML =
+    '<h4 class="reveals-title">Cartas reveladas</h4>' +
+    reveals
+      .map((reveal) => {
+        const seat = (seats || []).find((s) => s.user_id === reveal.user_id);
+        const name = displayName(reveal.user_id, seat && seat.username);
+        const cards = (reveal.hole_cards || []).map(cardHtml).join("");
+        const hand = reveal.hand_name ? " · " + escapeHtml(reveal.hand_name) : "";
+        return (
+          '<div class="reveal-player">' +
+          '<span class="seat-user">' + escapeHtml(name) + hand + "</span>" +
+          '<div class="cards">' + cards + "</div>" +
+          "</div>"
+        );
+      })
+      .join("");
 }
 
 function render() {
@@ -219,6 +255,7 @@ function render() {
   renderTurnLabel();
   renderWinners();
   renderSeats();
+  renderReveals();
 
   const community = (currentRound && currentRound.community_cards) || [];
   document.getElementById("community-cards").innerHTML = community.map(cardHtml).join("");
@@ -232,7 +269,11 @@ function render() {
   document.querySelectorAll("#actions button").forEach((button) => {
     button.disabled = !canAct || actionInFlight;
   });
-  document.getElementById("raise-amount").disabled = !canAct || actionInFlight;
+  const raiseInput = document.getElementById("raise-amount");
+  raiseInput.disabled = !canAct || actionInFlight;
+  const minRaiseTo = (currentRound && currentRound.min_raise_to_cents) || 0;
+  raiseInput.placeholder =
+    minRaiseTo > 0 ? "Nuevo total (mín. " + formatCents(minRaiseTo) + ")" : "Nuevo total ($)";
 }
 
 async function loadState() {
@@ -242,9 +283,17 @@ async function loadState() {
     table = data.table || table;
     seats = data.seats || [];
     currentRound = data.current_round || null;
-    if (!currentRound) {
+    if (currentRound) {
+      playersBySeat = {};
+      (currentRound.players || []).forEach((player) => {
+        playersBySeat[player.seat_position] = player;
+      });
+      winners = currentRound.winners || [];
+      reveals = currentRound.reveals || [];
+    } else {
       playersBySeat = {};
       winners = [];
+      reveals = [];
     }
     setMessage("");
     render();
@@ -266,12 +315,14 @@ function applyUpdate(update) {
     turn_expires_at: update.turn_expires_at,
     dealer_position: update.dealer_position,
     actions: update.actions || [],
+    reveals: update.reveals || [],
   };
   playersBySeat = {};
   (update.players || []).forEach((player) => {
     playersBySeat[player.seat_position] = player;
   });
   winners = update.winners || [];
+  reveals = update.reveals || [];
 }
 
 async function doAction(action) {
@@ -282,7 +333,16 @@ async function doAction(action) {
   let amountCents = 0;
   if (action === "raise") {
     amountCents = dollarsToCents(document.getElementById("raise-amount").value);
-    if (!amountCents || amountCents <= (currentRound.current_bet_cents || 0)) {
+    const minRaiseTo = (currentRound && currentRound.min_raise_to_cents) || 0;
+    if (minRaiseTo > 0) {
+      if (!amountCents || amountCents < minRaiseTo) {
+        setMessage(
+          "El raise debe ser al menos " + formatCents(minRaiseTo) + " (apuesta actual + último raise).",
+          "error"
+        );
+        return;
+      }
+    } else if (!amountCents || amountCents <= (currentRound.current_bet_cents || 0)) {
       setMessage(
         "El raise debe superar la apuesta actual (" + formatCents(currentRound.current_bet_cents || 0) + ").",
         "error"
