@@ -1019,17 +1019,18 @@ func (x *ListTablesResponse) GetTables() []*Table {
 // Si buy_in_amount_cents > 0, el creador queda sentado en la mesa
 // (el buy-in se reserva via Wallet.Hold) y se responden seat/hold.
 type CreateTableRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // usuario que crea la mesa
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	SmallBlindCents  int64                  `protobuf:"varint,3,opt,name=small_blind_cents,json=smallBlindCents,proto3" json:"small_blind_cents,omitempty"`
-	BigBlindCents    int64                  `protobuf:"varint,4,opt,name=big_blind_cents,json=bigBlindCents,proto3" json:"big_blind_cents,omitempty"`
-	MaxPlayers       int32                  `protobuf:"varint,5,opt,name=max_players,json=maxPlayers,proto3" json:"max_players,omitempty"`                       // 2..10
-	BuyInAmountCents int64                  `protobuf:"varint,6,opt,name=buy_in_amount_cents,json=buyInAmountCents,proto3" json:"buy_in_amount_cents,omitempty"` // 0 = solo crear (el creador no se sienta)
-	MinBuyInCents    int64                  `protobuf:"varint,7,opt,name=min_buy_in_cents,json=minBuyInCents,proto3" json:"min_buy_in_cents,omitempty"`          // 0 = default (10 big blinds)
-	MaxBuyInCents    int64                  `protobuf:"varint,8,opt,name=max_buy_in_cents,json=maxBuyInCents,proto3" json:"max_buy_in_cents,omitempty"`          // 0 = default (200 big blinds)
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	UserId             string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // usuario que crea la mesa
+	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	SmallBlindCents    int64                  `protobuf:"varint,3,opt,name=small_blind_cents,json=smallBlindCents,proto3" json:"small_blind_cents,omitempty"`
+	BigBlindCents      int64                  `protobuf:"varint,4,opt,name=big_blind_cents,json=bigBlindCents,proto3" json:"big_blind_cents,omitempty"`
+	MaxPlayers         int32                  `protobuf:"varint,5,opt,name=max_players,json=maxPlayers,proto3" json:"max_players,omitempty"`                          // 2..10
+	BuyInAmountCents   int64                  `protobuf:"varint,6,opt,name=buy_in_amount_cents,json=buyInAmountCents,proto3" json:"buy_in_amount_cents,omitempty"`    // 0 = solo crear (el creador no se sienta)
+	MinBuyInCents      int64                  `protobuf:"varint,7,opt,name=min_buy_in_cents,json=minBuyInCents,proto3" json:"min_buy_in_cents,omitempty"`             // 0 = default (10 big blinds)
+	MaxBuyInCents      int64                  `protobuf:"varint,8,opt,name=max_buy_in_cents,json=maxBuyInCents,proto3" json:"max_buy_in_cents,omitempty"`             // 0 = default (200 big blinds)
+	HoldIdempotencyKey string                 `protobuf:"bytes,9,opt,name=hold_idempotency_key,json=holdIdempotencyKey,proto3" json:"hold_idempotency_key,omitempty"` // opcional: clave idempotente para el Hold del auto-asiento
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *CreateTableRequest) Reset() {
@@ -1118,6 +1119,13 @@ func (x *CreateTableRequest) GetMaxBuyInCents() int64 {
 	return 0
 }
 
+func (x *CreateTableRequest) GetHoldIdempotencyKey() string {
+	if x != nil {
+		return x.HoldIdempotencyKey
+	}
+	return ""
+}
+
 type CreateTableResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Table         *Table                 `protobuf:"bytes,1,opt,name=table,proto3" json:"table,omitempty"`                                    // recien creada
@@ -1181,13 +1189,14 @@ func (x *CreateTableResponse) GetHoldId() string {
 // Compra de fichas y asignacion de asiento.
 // El buy-in se reserva internamente via Wallet.Hold.
 type JoinTableRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	TableId          string                 `protobuf:"bytes,1,opt,name=table_id,json=tableId,proto3" json:"table_id,omitempty"`
-	UserId           string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	BuyInAmountCents int64                  `protobuf:"varint,3,opt,name=buy_in_amount_cents,json=buyInAmountCents,proto3" json:"buy_in_amount_cents,omitempty"` // > 0
-	PreferredSeat    int32                  `protobuf:"varint,4,opt,name=preferred_seat,json=preferredSeat,proto3" json:"preferred_seat,omitempty"`              // -1 = asignar el primer asiento libre
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TableId            string                 `protobuf:"bytes,1,opt,name=table_id,json=tableId,proto3" json:"table_id,omitempty"`
+	UserId             string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	BuyInAmountCents   int64                  `protobuf:"varint,3,opt,name=buy_in_amount_cents,json=buyInAmountCents,proto3" json:"buy_in_amount_cents,omitempty"`    // > 0
+	PreferredSeat      int32                  `protobuf:"varint,4,opt,name=preferred_seat,json=preferredSeat,proto3" json:"preferred_seat,omitempty"`                 // -1 = asignar el primer asiento libre
+	HoldIdempotencyKey string                 `protobuf:"bytes,5,opt,name=hold_idempotency_key,json=holdIdempotencyKey,proto3" json:"hold_idempotency_key,omitempty"` // opcional: clave idempotente para el Hold
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *JoinTableRequest) Reset() {
@@ -1246,6 +1255,13 @@ func (x *JoinTableRequest) GetPreferredSeat() int32 {
 		return x.PreferredSeat
 	}
 	return 0
+}
+
+func (x *JoinTableRequest) GetHoldIdempotencyKey() string {
+	if x != nil {
+		return x.HoldIdempotencyKey
+	}
+	return ""
 }
 
 type JoinTableResponse struct {
@@ -1863,7 +1879,7 @@ const file_pb_poker_proto_rawDesc = "" +
 	"\x11ListTablesRequest\x12#\n" +
 	"\rstatus_filter\x18\x01 \x01(\tR\fstatusFilter\":\n" +
 	"\x12ListTablesResponse\x12$\n" +
-	"\x06tables\x18\x01 \x03(\v2\f.poker.TableR\x06tables\"\xb7\x02\n" +
+	"\x06tables\x18\x01 \x03(\v2\f.poker.TableR\x06tables\"\xe9\x02\n" +
 	"\x12CreateTableRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12*\n" +
@@ -1873,16 +1889,18 @@ const file_pb_poker_proto_rawDesc = "" +
 	"maxPlayers\x12-\n" +
 	"\x13buy_in_amount_cents\x18\x06 \x01(\x03R\x10buyInAmountCents\x12'\n" +
 	"\x10min_buy_in_cents\x18\a \x01(\x03R\rminBuyInCents\x12'\n" +
-	"\x10max_buy_in_cents\x18\b \x01(\x03R\rmaxBuyInCents\"w\n" +
+	"\x10max_buy_in_cents\x18\b \x01(\x03R\rmaxBuyInCents\x120\n" +
+	"\x14hold_idempotency_key\x18\t \x01(\tR\x12holdIdempotencyKey\"w\n" +
 	"\x13CreateTableResponse\x12\"\n" +
 	"\x05table\x18\x01 \x01(\v2\f.poker.TableR\x05table\x12#\n" +
 	"\rseat_position\x18\x02 \x01(\x05R\fseatPosition\x12\x17\n" +
-	"\ahold_id\x18\x03 \x01(\tR\x06holdId\"\x9c\x01\n" +
+	"\ahold_id\x18\x03 \x01(\tR\x06holdId\"\xce\x01\n" +
 	"\x10JoinTableRequest\x12\x19\n" +
 	"\btable_id\x18\x01 \x01(\tR\atableId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12-\n" +
 	"\x13buy_in_amount_cents\x18\x03 \x01(\x03R\x10buyInAmountCents\x12%\n" +
-	"\x0epreferred_seat\x18\x04 \x01(\x05R\rpreferredSeat\"\x8d\x01\n" +
+	"\x0epreferred_seat\x18\x04 \x01(\x05R\rpreferredSeat\x120\n" +
+	"\x14hold_idempotency_key\x18\x05 \x01(\tR\x12holdIdempotencyKey\"\x8d\x01\n" +
 	"\x11JoinTableResponse\x12\x19\n" +
 	"\btable_id\x18\x01 \x01(\tR\atableId\x12#\n" +
 	"\rseat_position\x18\x02 \x01(\x05R\fseatPosition\x12\x1f\n" +

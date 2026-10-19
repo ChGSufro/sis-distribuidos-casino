@@ -67,7 +67,7 @@ func (s *PokerService) CreateTable(ctx context.Context, req *pb.CreateTableReque
 		// Auto-asiento del creador: es best-effort; si falla (p. ej. fondos
 		// insuficientes en Wallet) se devuelve la mesa sin sentar y el
 		// cliente puede unirse de forma normal.
-		seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), buyIn, 0)
+		seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), buyIn, 0, req.GetHoldIdempotencyKey())
 		if err == nil {
 			if err := s.repo.UpdateTable(ctx, table); err != nil {
 				// Compensacion: sin asiento persistido, liberamos la reserva.
@@ -110,7 +110,7 @@ func (s *PokerService) JoinTable(ctx context.Context, req *pb.JoinTableRequest) 
 		return nil, ErrInvalidArgument
 	}
 
-	seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), req.GetBuyInAmountCents(), req.GetPreferredSeat())
+	seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), req.GetBuyInAmountCents(), req.GetPreferredSeat(), req.GetHoldIdempotencyKey())
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (s *PokerService) JoinTable(ctx context.Context, req *pb.JoinTableRequest) 
 // con stack 0), reservando el buy-in via Wallet.Hold. Muta table.Seats;
 // el llamador es responsable de persistirla. Debe invocarse con el lock de
 // la mesa adquirido salvo en CreateTable (mesa recien creada en memoria).
-func (s *PokerService) seatPlayer(ctx context.Context, table *game.Table, userID string, buyIn int64, preferredSeat int32) (int32, string, error) {
+func (s *PokerService) seatPlayer(ctx context.Context, table *game.Table, userID string, buyIn int64, preferredSeat int32, idemKey string) (int32, string, error) {
 	if buyIn < table.MinBuyIn() || buyIn > table.MaxBuyIn() {
 		return 0, "", ErrInvalidArgument
 	}
@@ -170,9 +170,13 @@ func (s *PokerService) seatPlayer(ctx context.Context, table *game.Table, userID
 
 	holdCtx, cancel := context.WithTimeout(ctx, walletTimeout)
 	defer cancel()
-	// Wallet limita idempotency_key a VARCHAR(64). El uuid garantiza unicidad
-	// por intento (los rebuy requieren un hold nuevo, no deduplica).
-	idemKey := fmt.Sprintf("poker:%s", uuid.New().String())
+	// Wallet limita idempotency_key a VARCHAR(64). Si el cliente no provee
+	// una clave idempotente (retry perdido), generamos una nueva por intento
+	// (rebuy distinto no deduplica). Para reintentos, el cliente debe enviar
+	// la misma hold_idempotency_key.
+	if idemKey == "" {
+		idemKey = fmt.Sprintf("poker:%s", uuid.New().String())
+	}
 	holdID, err := s.wallet.Hold(holdCtx, userID, buyIn, "poker", table.ID, idemKey)
 	if err != nil {
 		return 0, "", err

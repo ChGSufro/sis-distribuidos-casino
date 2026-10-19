@@ -100,13 +100,14 @@ func (h *PokerHandler) ListTables(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateTableRequestBody struct {
-	Name             string `json:"name"`
-	SmallBlindCents  int64  `json:"small_blind_cents"`
-	BigBlindCents    int64  `json:"big_blind_cents"`
-	MaxPlayers       int32  `json:"max_players"`
-	BuyInAmountCents int64  `json:"buy_in_amount_cents"`
-	MinBuyInCents    int64  `json:"min_buy_in_cents"`
-	MaxBuyInCents    int64  `json:"max_buy_in_cents"`
+	Name               string `json:"name"`
+	SmallBlindCents    int64  `json:"small_blind_cents"`
+	BigBlindCents      int64  `json:"big_blind_cents"`
+	MaxPlayers         int32  `json:"max_players"`
+	BuyInAmountCents   int64  `json:"buy_in_amount_cents"`
+	MinBuyInCents      int64  `json:"min_buy_in_cents"`
+	MaxBuyInCents      int64  `json:"max_buy_in_cents"`
+	HoldIdempotencyKey string `json:"hold_idempotency_key,omitempty"`
 }
 
 func (h *PokerHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
@@ -130,14 +131,15 @@ func (h *PokerHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := h.pokerClient.CreateTable(r.Context(), &pb_poker.CreateTableRequest{
-		UserId:           userID,
-		Name:             body.Name,
-		SmallBlindCents:  body.SmallBlindCents,
-		BigBlindCents:    body.BigBlindCents,
-		MaxPlayers:       body.MaxPlayers,
-		BuyInAmountCents: body.BuyInAmountCents,
-		MinBuyInCents:    body.MinBuyInCents,
-		MaxBuyInCents:    body.MaxBuyInCents,
+		UserId:               userID,
+		Name:                 body.Name,
+		SmallBlindCents:      body.SmallBlindCents,
+		BigBlindCents:        body.BigBlindCents,
+		MaxPlayers:           body.MaxPlayers,
+		BuyInAmountCents:     body.BuyInAmountCents,
+		MinBuyInCents:        body.MinBuyInCents,
+		MaxBuyInCents:        body.MaxBuyInCents,
+		HoldIdempotencyKey:   body.HoldIdempotencyKey,
 	})
 	if err != nil {
 		WriteGRPCError(w, err)
@@ -148,8 +150,9 @@ func (h *PokerHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 }
 
 type JoinTableRequestBody struct {
-	BuyInAmountCents int64  `json:"buy_in_amount_cents"`
-	PreferredSeat    *int32 `json:"preferred_seat"`
+	BuyInAmountCents   int64  `json:"buy_in_amount_cents"`
+	PreferredSeat      *int32 `json:"preferred_seat"`
+	HoldIdempotencyKey string `json:"hold_idempotency_key,omitempty"`
 }
 
 func (h *PokerHandler) JoinTable(w http.ResponseWriter, r *http.Request) {
@@ -182,10 +185,11 @@ func (h *PokerHandler) JoinTable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := h.pokerClient.JoinTable(r.Context(), &pb_poker.JoinTableRequest{
-		TableId:          tableID,
-		UserId:           userID,
-		BuyInAmountCents: body.BuyInAmountCents,
-		PreferredSeat:    preferredSeat,
+		TableId:            tableID,
+		UserId:             userID,
+		BuyInAmountCents:   body.BuyInAmountCents,
+		PreferredSeat:      preferredSeat,
+		HoldIdempotencyKey: body.HoldIdempotencyKey,
 	})
 	if err != nil {
 		WriteGRPCError(w, err)

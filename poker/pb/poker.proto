@@ -138,14 +138,15 @@ message ListTablesResponse {
 // Si buy_in_amount_cents > 0, el creador queda sentado en la mesa
 // (el buy-in se reserva via Wallet.Hold) y se responden seat/hold.
 message CreateTableRequest {
-  string user_id           = 1; // usuario que crea la mesa
-  string name              = 2;
-  int64  small_blind_cents = 3;
-  int64  big_blind_cents   = 4;
-  int32  max_players       = 5; // 2..10
-  int64  buy_in_amount_cents = 6; // 0 = solo crear (el creador no se sienta)
-  int64  min_buy_in_cents    = 7; // 0 = default (10 big blinds)
-  int64  max_buy_in_cents    = 8; // 0 = default (200 big blinds)
+  string user_id                = 1; // usuario que crea la mesa
+  string name                   = 2;
+  int64  small_blind_cents      = 3;
+  int64  big_blind_cents        = 4;
+  int32  max_players            = 5; // 2..10
+  int64  buy_in_amount_cents    = 6; // 0 = solo crear (el creador no se sienta)
+  int64  min_buy_in_cents       = 7; // 0 = default (10 big blinds)
+  int64  max_buy_in_cents       = 8; // 0 = default (200 big blinds)
+  string hold_idempotency_key   = 9; // opcional: clave idempotente para el Hold del auto-asiento
 }
 
 message CreateTableResponse {
@@ -157,10 +158,11 @@ message CreateTableResponse {
 // Compra de fichas y asignacion de asiento.
 // El buy-in se reserva internamente via Wallet.Hold.
 message JoinTableRequest {
-  string table_id            = 1;
-  string user_id             = 2;
-  int64  buy_in_amount_cents = 3; // > 0
-  int32  preferred_seat      = 4; // -1 = asignar el primer asiento libre
+  string table_id              = 1;
+  string user_id               = 2;
+  int64  buy_in_amount_cents   = 3; // > 0
+  int32  preferred_seat        = 4; // -1 = asignar el primer asiento libre
+  string hold_idempotency_key  = 5; // opcional: clave idempotente para el Hold
 }
 
 message JoinTableResponse {
