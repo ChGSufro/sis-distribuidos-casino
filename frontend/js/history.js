@@ -45,6 +45,19 @@ function labelFor(map, value) {
 
 const SUIT_SYMBOLS = { H: "♥", D: "♦", C: "♣", S: "♠" };
 
+const DETAIL_KEY_LABELS = {
+  amountCents: "Monto",
+  winAmountCents: "Ganado",
+  betAmountCents: "Apostado",
+  potSizeCents: "Bote",
+  yourResult: "Resultado",
+  finalStage: "Etapa",
+  playerCount: "Jugadores",
+  tableId: "Mesa",
+};
+
+const DETAIL_HIDDEN_KEYS = ["holdId", "gameRefId", "id", "event_id"];
+
 function cardText(card) {
   if (!card) return "";
   const symbol = SUIT_SYMBOLS[card.suit] || card.suit || "";
@@ -80,8 +93,68 @@ function rawDetailsText(raw) {
   if (parsed === null) return raw || "";
   if (typeof parsed !== "object" || parsed === null) return String(parsed);
   return Object.keys(parsed)
-    .map((key) => key + ": " + formatDetailValue(key, parsed[key]))
+    .filter((key) => DETAIL_HIDDEN_KEYS.indexOf(key) === -1)
+    .map((key) => {
+      const label = DETAIL_KEY_LABELS[key] || key;
+      return label + ": " + formatDetailValue(key, parsed[key]);
+    })
     .join(", ");
+}
+
+function renderPokerDetails(event, parsed) {
+  if (event.action === "player_buyin" || event.action === "player_payout") {
+    return (
+      '<div class="detail-summary"><span>Monto: ' +
+      escapeHtml(formatCents(Number(parsed.amountCents) || 0)) +
+      "</span></div>"
+    );
+  }
+
+  if (event.action === "table_result") {
+    const won = parsed.yourResult === "win";
+    let html = '<div class="detail-summary">';
+    html +=
+      '<span class="result ' +
+      (won ? "win" : "lose") +
+      '">' +
+      (won ? "Ganó" : "Perdió") +
+      "</span>";
+    html +=
+      "<span>Apostado: " +
+      escapeHtml(formatCents(Number(parsed.betAmountCents) || 0)) +
+      "</span>";
+    html +=
+      "<span>Ganado: " +
+      escapeHtml(formatCents(Number(parsed.winAmountCents) || 0)) +
+      "</span>";
+    html +=
+      "<span>Bote: " +
+      escapeHtml(formatCents(Number(parsed.potSizeCents) || 0)) +
+      "</span>";
+    if (parsed.finalStage) {
+      html += "<span>Etapa: " + escapeHtml(parsed.finalStage) + "</span>";
+    }
+    if (parsed.playerCount) {
+      html += "<span>Jugadores: " + escapeHtml(parsed.playerCount) + "</span>";
+    }
+    html += "</div>";
+
+    const yourHand = cardsText(parsed.yourHand);
+    const community = cardsText(parsed.communityCards);
+    if (yourHand || community) {
+      html += '<div class="detail-cards">';
+      if (yourHand) {
+        html += "<div>Tu mano: " + escapeHtml(yourHand) + "</div>";
+      }
+      if (community) {
+        html += "<div>Comunitarias: " + escapeHtml(community) + "</div>";
+      }
+      html += "</div>";
+    }
+    return html;
+  }
+
+  return "";
 }
 
 function renderHandResult(parsed) {
@@ -141,13 +214,17 @@ function renderDetails(event) {
   const raw = event.details;
   if (!raw) return "";
   const parsed = parseDetails(raw);
-  if (
-    parsed &&
-    typeof parsed === "object" &&
-    event.action === "hand_result" &&
-    Array.isArray(parsed.subHands)
-  ) {
-    return renderHandResult(parsed);
+  if (parsed && typeof parsed === "object") {
+    if (
+      event.action === "hand_result" &&
+      Array.isArray(parsed.subHands)
+    ) {
+      return renderHandResult(parsed);
+    }
+    if (event.game_type === "poker") {
+      const pokerHtml = renderPokerDetails(event, parsed);
+      if (pokerHtml) return pokerHtml;
+    }
   }
   return escapeHtml(rawDetailsText(raw));
 }
