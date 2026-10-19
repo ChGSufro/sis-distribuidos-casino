@@ -17,7 +17,7 @@ func New(clients *client.Clients) http.Handler {
 	authH := handler.NewAuthHandler(clients.Users, clients.Wallet)
 	walletH := handler.NewWalletHandler(clients.Wallet)
 	bjH := handler.NewBlackjackHandler(clients.Blackjack)
-	pokerH := handler.NewPokerHandler(clients.Poker)
+	pokerH := handler.NewPokerHandler(clients.Poker, clients.Users)
 	historyH := handler.NewHistoryHandler(clients.History)
 	statsH := handler.NewStatsHandler(clients.Stats)
 
@@ -56,6 +56,7 @@ func New(clients *client.Clients) http.Handler {
 	mux.HandleFunc("POST /api/games/poker/tables/{id}/join", authMW.RequireAuth(pokerH.JoinTable))
 	mux.HandleFunc("POST /api/games/poker/tables/{id}/leave", authMW.RequireAuth(pokerH.LeaveTable))
 	mux.HandleFunc("POST /api/games/poker/tables/{id}/action", authMW.RequireAuth(pokerH.PlayerAction))
+	mux.HandleFunc("POST /api/games/poker/tables/{id}/close", authMW.RequireAuth(pokerH.CloseTable))
 	mux.HandleFunc("GET /api/games/poker/tables/{id}", authMW.RequireAuth(pokerH.GetTableState))
 
 	// History & Audit

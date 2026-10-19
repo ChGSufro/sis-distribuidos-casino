@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/service"
+	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -52,6 +52,11 @@ func (h *PokerHandler) GetTableState(ctx context.Context, req *pb.GetTableStateR
 	return res, toStatus(err)
 }
 
+func (h *PokerHandler) CloseTable(ctx context.Context, req *pb.CloseTableRequest) (*pb.CloseTableResponse, error) {
+	res, err := h.svc.CloseTable(ctx, req)
+	return res, toStatus(err)
+}
+
 // toStatus traduce los errores de negocio a codigos gRPC.
 func toStatus(err error) error {
 	if err == nil {
@@ -70,8 +75,11 @@ func toStatus(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, service.ErrNotYourTurn),
 		errors.Is(err, service.ErrInvalidAction),
-		errors.Is(err, service.ErrNoActiveRound):
+		errors.Is(err, service.ErrNoActiveRound),
+		errors.Is(err, service.ErrTableHasPlayers):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, service.ErrNotCreator):
+		return status.Error(codes.PermissionDenied, err.Error())
 	default:
 		return status.Error(codes.Internal, "error interno")
 	}

@@ -133,6 +133,21 @@ func (m *Mongo) UpdateRound(ctx context.Context, r *game.Round) error {
 	return err
 }
 
+// ScrubRoundCards elimina la informacion privada de una ronda ya cerrada
+// (baraja remanente y cartas privadas) para que no quede en MongoDB.
+// Se llama cuando la ronda settled sale de la ventana de visualizacion.
+func (m *Mongo) ScrubRoundCards(ctx context.Context, id string) error {
+	oid, err := parseOID(id)
+	if err != nil {
+		return err
+	}
+	_, err = m.rounds.UpdateByID(ctx, oid, bson.M{"$set": bson.M{
+		"deck":                  []cardDoc{},
+		"players.$[].holeCards": []cardDoc{},
+	}})
+	return err
+}
+
 // NextRoundNumber calcula el numero secuencial de la proxima mano de una mesa.
 func (m *Mongo) NextRoundNumber(ctx context.Context, tableID string) (int64, error) {
 	opts := options.FindOne().SetSort(bson.D{{Key: "roundNumber", Value: -1}})
