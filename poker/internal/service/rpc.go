@@ -61,6 +61,9 @@ func (s *PokerService) CreateTable(ctx context.Context, req *pb.CreateTableReque
 
 	resp := &pb.CreateTableResponse{Table: tableToPB(table), SeatPosition: -1}
 	if buyIn := req.GetBuyInAmountCents(); buyIn > 0 {
+		lock := s.locks.get(table.ID)
+		lock.Lock()
+		defer lock.Unlock()
 		// Auto-asiento del creador: es best-effort; si falla (p. ej. fondos
 		// insuficientes en Wallet) se devuelve la mesa sin sentar y el
 		// cliente puede unirse de forma normal.
