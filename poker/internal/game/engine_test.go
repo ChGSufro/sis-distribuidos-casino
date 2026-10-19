@@ -217,3 +217,141 @@ func hasWinner(r *Round, userID, potType string, amount int64) bool {
 	}
 	return false
 }
+
+func TestMinRaiseEnforced(t *testing.T) {
+	tbl := newTable(10000, 10000, 10000)
+	now := time.Now()
+	r, err := StartRound(tbl, "r1", 1, rand.New(rand.NewSource(7)), now, testTTL)
+	if err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	// Dealer(SB) sube al minimo valido: current=100, lastRaise=100 -> 200.
+	if err := ApplyAction(tbl, r, "u0", ActionRaise, 200, now, testTTL); err != nil {
+		t.Fatalf("raise al minimo (200): %v", err)
+	}
+	// Un centavo sobre la apuesta actual no debe valer (min-raise 300).
+	err = ApplyAction(tbl, r, "u1", ActionRaise, 201, now, testTTL)
+	if err == nil {
+		t.Fatal("raise a 201 debe rechazarse por min-raise")
+	}
+	// Raise completo: 100 (actual) + 100 (ultimo raise) = min 300.
+	if err := ApplyAction(tbl, r, "u1", ActionRaise, 300, now, testTTL); err != nil {
+		t.Fatalf("raise al minimo siguiente (300): %v", err)
+	}
+	if r.LastRaiseCents != 100 {
+		t.Fatalf("lastRaise esperado 100, fue %d", r.LastRaiseCents)
+	}
+}
+
+// TestMinRaiseToCentsExponeMinimoLegal: el estado expuesto al frontend
+// (last_raise_cents / min_raise_to_cents) debe coincidir siempre con lo
+// que la validacion del motor acepta.
+func TestMinRaiseToCentsExponeMinimoLegal(t *testing.T) {
+	tbl := newTable(10000, 10000, 10000)
+	now := time.Now()
+	r, err := StartRound(tbl, "r1", 1, rand.New(rand.NewSource(11)), now, testTTL)
+	if err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	// Preflop: current=100, lastRaise=100 -> min raise-to 200.
+	if r.MinRaiseToCents() != 200 || r.LastRaiseCents != 100 {
+		t.Fatalf("preflop esperado min=200 last=100, fue min=%d last=%d",
+			r.MinRaiseToCents(), r.LastRaiseCents)
+	}
+	if err := ApplyAction(tbl, r, "u0", ActionRaise, 200, now, testTTL); err != nil {
+		t.Fatalf("raise a 200: %v", err)
+	}
+	// Tras un raise de 100: current=200, lastRaise=100 -> min raise-to 300.
+	if r.MinRaiseToCents() != 300 || r.LastRaiseCents != 100 {
+		t.Fatalf("tras raise esperado min=300 last=100, fue min=%d last=%d",
+			r.MinRaiseToCents(), r.LastRaiseCents)
+	}
+	// Primera apuesta de una calle sin bet: el minimo vuelve al big blind.
+	r.CurrentBetCents = 0
+	r.LastRaiseCents = 0
+	if r.MinRaiseToCents() != 100 {
+		t.Fatalf("calle sin apuesta esperado min=100 (BB), fue %d", r.MinRaiseToCents())
+	}
+}
+
+func TestShortAllInRaiseAllowed(t *testing.T) {
+	tbl := newTable(150, 10000, 10000)
+	now := time.Now()
+	r, err := StartRound(tbl, "r1", 1, rand.New(rand.NewSource(8)), now, testTTL)
+	if err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	// u0 tiene 150, apostó SB 50. All-in corto siempre esta permitido
+	// aunque no alcance el min-raise.
+	if err := ApplyAction(tbl, r, "u0", ActionAllIn, 0, now, testTTL); err != nil {
+		t.Fatalf("all-in corto: %v", err)
+	}
+	if r.CurrentBetCents != 150 {
+		t.Fatalf("current bet esperado 150, fue %d", r.CurrentBetCents)
+	}
+	if r.LastRaiseCents != 100 {
+		t.Fatalf("un all-in corto no reabre el raise: lastRaise esperado 100, fue %d", r.LastRaiseCents)
+	}
+}
+
+func TestTimeoutChecksWhenNoBetToCall(t *testing.T) {
+	tbl := newTable(10000, 10000)
+	now := time.Now()
+	r, err := StartRound(tbl, "r1", 1, rand.New(rand.NewSource(9)), now, testTTL)
+	if err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	// Preflop: u0 (SB) hace call, u1 (BB) checkea -> u0 debe actuar
+	// primero en el flop sin apuesta pendiente.
+	if err := ApplyAction(tbl, r, "u0", ActionCall, 0, now, testTTL); err != nil {
+		t.Fatalf("call u0: %v", err)
+	}
+	if err := ApplyAction(tbl, r, "u1", ActionCheck, 0, now, testTTL); err != nil {
+		t.Fatalf("check u1: %v", err)
+	}
+	if r.Stage != StageFlop {
+		t.Fatalf("se esperaba flop, fue %s", r.Stage)
+	}
+	p := r.PlayerAt(r.CurrentTurn)
+	if p == nil {
+		t.Fatal("sin jugador en turno")
+	}
+	if p.StreetBetCents != 0 {
+		t.Fatalf("en el flop no debe haber apuesta pendiente; streetBet=%d", p.StreetBetCents)
+	}
+	folded, err := AutoFold(tbl, r, now.Add(testTTL+time.Second), testTTL)
+	if err != nil {
+		t.Fatalf("AutoFold: %v", err)
+	}
+	if !folded {
+		t.Fatal("el timeout debe ejecutar una accion")
+	}
+	if p.Status != PlayerActive {
+		t.Fatalf("el timeout debe hacer check (sigue activo), fue %s", p.Status)
+	}
+	if r.Stage == StageSettled {
+		t.Fatal("no debe resolverse la ronda por un check")
+	}
+}
+
+func TestHeadsUpPostflopDealerActsFirst(t *testing.T) {
+	tbl := newTable(10000, 10000)
+	now := time.Now()
+	r, err := StartRound(tbl, "r1", 1, rand.New(rand.NewSource(10)), now, testTTL)
+	if err != nil {
+		t.Fatalf("StartRound: %v", err)
+	}
+	if err := ApplyAction(tbl, r, "u0", ActionCall, 0, now, testTTL); err != nil {
+		t.Fatalf("call u0: %v", err)
+	}
+	if err := ApplyAction(tbl, r, "u1", ActionCheck, 0, now, testTTL); err != nil {
+		t.Fatalf("check u1: %v", err)
+	}
+	if r.Stage != StageFlop {
+		t.Fatalf("se esperaba flop, fue %s", r.Stage)
+	}
+	// Heads-up: el dealer (SB, asiento 0) abre la apuesta postflop.
+	if r.CurrentTurn != r.DealerPosition {
+		t.Fatalf("heads-up: el dealer (%d) debe actuar primero postflop, turno=%d", r.DealerPosition, r.CurrentTurn)
+	}
+}

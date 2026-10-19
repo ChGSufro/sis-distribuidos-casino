@@ -6,12 +6,12 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/client"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/config"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/handler"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/service"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/store"
+	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -26,9 +26,17 @@ func main() {
 	}
 	defer func() { _ = st.Close(ctx) }()
 
-	// Seams Wallet/History: por ahora implementaciones no-op locales.
-	// Ver internal/client para conectar los servicios reales.
-	svc := service.New(st, client.NoopWallet{}, client.NoopHistory{}, cfg.TurnTTL)
+	// Wallet: obligatorio (fatal si no esta disponible). History: best-effort
+	// con fallback a Noop, siguiendo el patron de blackjack.
+	walletClient, err := client.NewWalletGRPC(cfg.WalletAddr)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	defer func() { _ = walletClient.Close() }()
+	historyClient := client.NewHistoryGRPC(cfg.HistoryAddr)
+	defer func() { _ = historyClient.Close() }()
+
+	svc := service.New(st, walletClient, historyClient, cfg.TurnTTL, cfg.SettleDisplay)
 	go svc.RunAutoFold(ctx, time.Second)
 
 	lis, err := net.Listen("tcp", ":"+cfg.GRPCPort)

@@ -213,20 +213,24 @@ services:
   # Poker Service (Alex Sáez)
   poker:
     build:
-      context: ./poker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: poker/Dockerfile
     container_name: poker
     restart: unless-stopped
+    depends_on:
+      mongo-poker:
+        condition: service_healthy
+      wallet:
+        condition: service_started
     environment:
       GRPC_PORT: ${POKER_GRPC_PORT:-50055}
       MONGO_URI: mongodb://mongo-poker:27017
       MONGO_DB: ${MONGO_POKER_DB:-poker_state_db}
       HISTORY_ADDR: ${HISTORY_ADDR:-history:50053}
+      WALLET_SERVICE_URL: wallet:${WALLET_PORT:-50051}
+      SETTLE_DISPLAY_SECONDS: ${SETTLE_DISPLAY_SECONDS:-10}
     ports:
       - "${POKER_GRPC_PORT:-50055}:50055"
-    depends_on:
-      mongo-poker:
-        condition: service_healthy
     networks:
       - casino-net
 

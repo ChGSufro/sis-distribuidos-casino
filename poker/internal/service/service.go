@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/client"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/game"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/store"
+	"github.com/google/uuid"
 )
 
 // Errores de negocio del servicio de poker.
@@ -24,6 +27,8 @@ var (
 	ErrSeatTaken       = errors.New("el asiento solicitado esta ocupado")
 	ErrNotYourTurn     = errors.New("no es el turno del jugador")
 	ErrInvalidAction   = errors.New("accion invalida")
+	ErrNotCreator      = errors.New("solo el creador puede cerrar la mesa")
+	ErrTableHasPlayers = errors.New("la mesa tiene jugadores sentados")
 )
 
 // PokerService orquesta el motor de juego con la persistencia y las
@@ -33,6 +38,9 @@ type PokerService struct {
 	wallet  client.WalletClient
 	history client.HistoryClient
 	turnTTL time.Duration
+	// settleDisplay es la ventana en que la ronda settled (con winners y
+	// reveals) permanece visible antes de arrancar la siguiente mano.
+	settleDisplay time.Duration
 
 	rngMu sync.Mutex
 	rng   *rand.Rand
@@ -41,17 +49,21 @@ type PokerService struct {
 }
 
 // New construye el servicio de poker.
-func New(repo *store.Mongo, wallet client.WalletClient, history client.HistoryClient, turnTTL time.Duration) *PokerService {
+func New(repo *store.Mongo, wallet client.WalletClient, history client.HistoryClient, turnTTL, settleDisplay time.Duration) *PokerService {
 	if turnTTL <= 0 {
 		turnTTL = 30 * time.Second
 	}
+	if settleDisplay <= 0 {
+		settleDisplay = 10 * time.Second
+	}
 	return &PokerService{
-		repo:    repo,
-		wallet:  wallet,
-		history: history,
-		turnTTL: turnTTL,
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
-		locks:   newTableLocks(),
+		repo:          repo,
+		wallet:        wallet,
+		history:       history,
+		turnTTL:       turnTTL,
+		settleDisplay: settleDisplay,
+		rng:           rand.New(rand.NewSource(time.Now().UnixNano())),
+		locks:         newTableLocks(),
 	}
 }
 
@@ -79,7 +91,7 @@ func (s *PokerService) RunAutoFold(ctx context.Context, interval time.Duration) 
 }
 
 func (s *PokerService) autoFoldOnce(ctx context.Context, now time.Time) {
-	tables, err := s.repo.ListTables(ctx, game.TableActive)
+	tables, err := s.repo.ListTables(ctx, "")
 	if err != nil {
 		return
 	}
@@ -87,11 +99,14 @@ func (s *PokerService) autoFoldOnce(ctx context.Context, now time.Time) {
 		if t.CurrentRoundID == "" {
 			continue
 		}
-		s.autoFoldTable(ctx, t.ID, now)
+		s.tickTable(ctx, t.ID, now)
 	}
 }
 
-func (s *PokerService) autoFoldTable(ctx context.Context, tableID string, now time.Time) {
+// tickTable avanza la mesa en un tick: si la ronda esta settled y expiro la
+// ventana de visualizacion la cierra (scrub + siguiente mano); si no,
+// aplica auto-fold a los turnos expirados.
+func (s *PokerService) tickTable(ctx context.Context, tableID string, now time.Time) {
 	lock := s.locks.get(tableID)
 	lock.Lock()
 	defer lock.Unlock()
@@ -101,7 +116,11 @@ func (s *PokerService) autoFoldTable(ctx context.Context, tableID string, now ti
 		return
 	}
 	round, err := s.repo.GetRound(ctx, table.CurrentRoundID)
-	if err != nil || round.IsSettled() {
+	if err != nil {
+		return
+	}
+	if round.IsSettled() {
+		s.expireSettledRound(ctx, table, round, now)
 		return
 	}
 	changed, err := game.AutoFold(table, round, now, s.turnTTL)
@@ -115,15 +134,39 @@ func (s *PokerService) autoFoldTable(ctx context.Context, tableID string, now ti
 	}
 }
 
+// expireSettledRound cierra la ronda settled cuando ya paso la ventana de
+// visualizacion: elimina la informacion privada de MongoDB, libera la ronda
+// y arranca la siguiente mano si hay jugadores suficientes.
+func (s *PokerService) expireSettledRound(ctx context.Context, table *game.Table, round *game.Round, now time.Time) {
+	if round.SettledAt != nil && now.Before(round.SettledAt.Add(s.settleDisplay)) {
+		return // la ronda aun se esta mostrando a los clientes
+	}
+	_ = s.repo.ScrubRoundCards(ctx, round.ID)
+	table.CurrentRoundID = ""
+	_ = s.repo.UpdateTable(ctx, table)
+	_ = s.maybeStartRound(ctx, table)
+}
+
 // maybeStartRound inicia una nueva mano si hay suficientes jugadores y no hay
-// una ronda en curso.
+// una ronda en curso. Si la ronda actual esta settled pero fuera de la
+// ventana de visualizacion, la cierra antes de arrancar la siguiente.
 func (s *PokerService) maybeStartRound(ctx context.Context, table *game.Table) error {
 	if table.Status == game.TableClosed {
 		return nil
 	}
 	if table.CurrentRoundID != "" {
-		if r, err := s.repo.GetRound(ctx, table.CurrentRoundID); err == nil && !r.IsSettled() {
-			return nil
+		if r, err := s.repo.GetRound(ctx, table.CurrentRoundID); err == nil {
+			if !r.IsSettled() {
+				return nil
+			}
+			if r.SettledAt != nil && time.Now().UTC().Before(r.SettledAt.Add(s.settleDisplay)) {
+				return nil // la ronda settled aun se esta mostrando
+			}
+			_ = s.repo.ScrubRoundCards(ctx, r.ID)
+			table.CurrentRoundID = ""
+			if err := s.repo.UpdateTable(ctx, table); err != nil {
+				return err
+			}
 		}
 	}
 	if len(table.ActiveSeats()) < 2 {
@@ -145,24 +188,127 @@ func (s *PokerService) maybeStartRound(ctx context.Context, table *game.Table) e
 	return s.repo.UpdateTable(ctx, table)
 }
 
-// finalizeRound cierra la ronda: la audita en History y, si aun hay jugadores,
-// comienza la siguiente mano.
+// finalizeRound cierra la ronda settled: liquida los holds de los jugadores
+// que se quedaron sin fichas (stack 0) y emite los eventos de historial por
+// jugador (table_result). NO arranca la siguiente mano ni libera la ronda:
+// los clientes con polling deben poder ver winners y reveals durante la
+// ventana settleDisplay; la limpieza la hace el ticker (expireSettledRound).
 func (s *PokerService) finalizeRound(ctx context.Context, table *game.Table, round *game.Round) {
-	event := client.GameEvent{
-		GameType:   "poker",
-		TableID:    table.ID,
-		RoundID:    round.ID,
-		PotCents:   round.PotSizeCents,
-		FinishedAt: time.Now().UTC(),
-	}
-	for _, w := range round.Winners {
-		event.Winners = append(event.Winners, client.WinnerInfo{UserID: w.UserID, AmountCents: w.AmountCents})
-	}
-	_ = s.history.RecordGameEvent(ctx, event)
+	s.settleBustedSeats(ctx, table)
+	s.emitTableResults(ctx, round)
+}
 
-	table.CurrentRoundID = ""
-	_ = s.repo.UpdateTable(ctx, table)
-	_ = s.maybeStartRound(ctx, table)
+// settleBustedSeats cierra el hold de todo asiento que se quedo sin fichas
+// en esta ronda (Settle con 0: el dinero ya se perdio en la mesa), de modo
+// que no queden reservas colgadas en Wallet y el asiento pueda hacer rebuy
+// o abandonar sin liquidacion pendiente.
+func (s *PokerService) settleBustedSeats(ctx context.Context, table *game.Table) {
+	changed := false
+	for i := range table.Seats {
+		seat := &table.Seats[i]
+		if seat.Status != game.SeatSittingOut || seat.StackCents != 0 || seat.HoldID == "" {
+			continue
+		}
+		settleCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+		err := func() error {
+			defer cancel()
+			_, err := s.wallet.Settle(settleCtx, seat.HoldID, 0)
+			return err
+		}()
+		if err != nil {
+			log.Printf("no se pudo liquidar hold de jugador quebrado %s: %v", seat.UserID, err)
+			continue // se reintenta en el proximo finalizeRound
+		}
+		seat.HoldID = ""
+		changed = true
+	}
+	if changed {
+		if err := s.repo.UpdateTable(ctx, table); err != nil {
+			log.Printf("no se pudo persistir liquidacion de quebrados: %v", err)
+		}
+	}
+}
+
+// emitPlayerBuyin registra la compra de fichas de un jugador (stats suma
+// totalWagered con amountCents; contrato en docs/informe-plan.md).
+func (s *PokerService) emitPlayerBuyin(ctx context.Context, table *game.Table, userID string, amountCents int64, holdID string) {
+	s.emitEvent(ctx, userID, table.ID, "player_buyin", map[string]interface{}{
+		"tableId":     table.ID,
+		"amountCents": amountCents,
+		"holdId":      holdID,
+	})
+}
+
+// emitPlayerPayout registra la salida de la mesa con la liquidacion final.
+func (s *PokerService) emitPlayerPayout(ctx context.Context, table *game.Table, userID string, amountCents int64, holdID string) {
+	s.emitEvent(ctx, userID, table.ID, "player_payout", map[string]interface{}{
+		"tableId":     table.ID,
+		"amountCents": amountCents,
+		"holdId":      holdID,
+	})
+}
+
+// cardJSON refleja el contrato de details de History (keys en minuscula).
+type cardJSON struct {
+	Suit string `json:"suit"`
+	Rank string `json:"rank"`
+}
+
+func cardsJSON(cards []game.Card) []cardJSON {
+	out := make([]cardJSON, 0, len(cards))
+	for _, c := range cards {
+		out = append(out, cardJSON{Suit: c.Suit, Rank: c.Rank})
+	}
+	return out
+}
+
+// emitTableResults registra en History un evento table_result POR JUGADOR
+// de la ronda, con el contrato documentado en docs/informe-plan.md
+// (stats lee yourResult y winAmountCents).
+func (s *PokerService) emitTableResults(ctx context.Context, round *game.Round) {
+	for i := range round.Players {
+		p := &round.Players[i]
+		winAmount := int64(0)
+		for _, w := range round.Winners {
+			if w.UserID == p.UserID {
+				winAmount += w.AmountCents
+			}
+		}
+		result := "lose"
+		if winAmount > 0 {
+			result = "win"
+		}
+		details := map[string]interface{}{
+			"finalStage":     round.EndStage,
+			"yourResult":     result,
+			"winAmountCents": winAmount,
+			"communityCards": cardsJSON(round.CommunityCards),
+			"yourHand":       cardsJSON(p.HoleCards),
+			"playerCount":    len(round.Players),
+			"potSizeCents":   livePot(round),
+		}
+		s.emitEvent(ctx, p.UserID, round.ID, "table_result", details)
+	}
+}
+
+// emitEvent construye y registra un evento de historial. Los fallos son
+// best-effort: el cliente ya loguea [RESILIENCIA] y nunca interrumpen la
+// partida.
+func (s *PokerService) emitEvent(ctx context.Context, userID, gameRefID, action string, details interface{}) {
+	raw, err := json.Marshal(details)
+	if err != nil {
+		log.Printf("[HISTORY] no se pudo serializar details de %s: %v", action, err)
+		return
+	}
+	_ = s.history.RecordGameEvent(ctx, client.GameEvent{
+		EventID:   uuid.New().String(),
+		UserID:    userID,
+		GameType:  "poker",
+		GameRefID: gameRefID,
+		Action:    action,
+		Details:   string(raw),
+		Timestamp: time.Now().UTC(),
+	})
 }
 
 func (s *PokerService) getActiveRound(ctx context.Context, table *game.Table) (*game.Round, error) {

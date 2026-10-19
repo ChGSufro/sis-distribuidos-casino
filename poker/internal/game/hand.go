@@ -35,6 +35,30 @@ func (a HandRank) Compare(b HandRank) int {
 	return 0
 }
 
+// handNames traduce la categoria de una mano a su nombre en espanol.
+var handNames = map[int]string{
+	HighCard:      "Carta alta",
+	OnePair:       "Par",
+	TwoPair:       "Doble par",
+	ThreeOfAKind:  "Trio",
+	Straight:      "Escalera",
+	Flush:         "Color",
+	FullHouse:     "Full",
+	FourOfAKind:   "Poker",
+	StraightFlush: "Escalera de color",
+}
+
+// Name devuelve el nombre de la categoria de la mano.
+func (r HandRank) Name() string {
+	if r.Category < 0 {
+		return ""
+	}
+	if name, ok := handNames[r.Category]; ok {
+		return name
+	}
+	return ""
+}
+
 // BestHand evalua la mejor mano de 5 cartas posible entre todas las cartas
 // dadas (normalmente 7: 2 privadas + 5 comunitarias).
 func BestHand(cards []Card) HandRank {
