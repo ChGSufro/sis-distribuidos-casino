@@ -121,14 +121,13 @@ func metricsFor(ev Event) Metrics {
 		}
 	case "table_result":
 		m.Played = true
+		m.WageredCents = asCents(ev.Details, "betAmountCents")
 		if asString(ev.Details, "yourResult") == "win" {
 			m.Result = ResultWin
 			m.WonCents = asCents(ev.Details, "winAmountCents")
 		} else {
 			m.Result = ResultLose
 		}
-	case "player_buyin":
-		m.WageredCents = asCents(ev.Details, "amountCents")
 	}
 
 	return m

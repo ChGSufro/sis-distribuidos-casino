@@ -282,6 +282,7 @@ func (s *PokerService) emitTableResults(ctx context.Context, round *game.Round) 
 			"finalStage":     round.EndStage,
 			"yourResult":     result,
 			"winAmountCents": winAmount,
+			"betAmountCents": p.TotalBetInRoundCents,
 			"communityCards": cardsJSON(round.CommunityCards),
 			"yourHand":       cardsJSON(p.HoleCards),
 			"playerCount":    len(round.Players),
