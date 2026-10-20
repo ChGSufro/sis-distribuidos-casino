@@ -33,6 +33,30 @@ curl localhost:8080/health  # → {"status":"healthy","service":"api-gateway"}
 
 La primera ejecución construye las imágenes de los 7 servicios y puede tardar unos minutos.
 
+## Usar la UI
+
+La interfaz web está en [`frontend/`](frontend/) (HTML/CSS/JS estático, sin build). Se comunica con el API Gateway en `http://localhost:8080`.
+
+```bash
+# 1. Levantar el backend
+docker compose up --build -d
+
+# 2. Servir la UI (requiere Python 3)
+cd frontend && python3 -m http.server 8000
+```
+
+Abrir **http://localhost:8000** → `index.html`.
+
+### Flujo básico
+
+1. **Registro / Login** (`index.html`): crear cuenta (usuario, email, contraseña) e iniciar sesión. El token JWT se guarda en `localStorage` y se renueva automáticamente.
+2. **Menú superior**: Blackjack | Póker | Historial | Estadísticas | Salir.
+3. **Blackjack** (`game.html`): depositar saldo en la barra superior → crear mano con tu apuesta → `hit`, `stand`, `double`, `split` o `surrender`.
+4. **Póker** (`poker.html`): crear mesa (ciegas, máx. jugadores, buy-in opcional) o unirse a una existente → en la mesa: `fold`, `check`, `call`, `raise` o `all-in`. Las fichas son reales (wallet): el saldo se reserva al entrar y se liquida al salir.
+5. **Historial** (`history.html`): partidas con filtro por juego (blackjack/póker) y paginación.
+6. **Estadísticas** (`stats.html`): total apostado, ganado, beneficio neto, partidas jugadas y win rate.
+7. **Salir**: cierra la sesión (logout) y limpia `localStorage`.
+
 ## Comandos Docker útiles para evaluación
 
 ### Estado y salud
