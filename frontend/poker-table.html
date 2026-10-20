@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Mesa de póker</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header id="app-nav"></header>
+
+  <main class="container">
+    <div class="top-bar">
+      <h1 id="table-name">Mesa</h1>
+      <button id="leave-btn" class="btn">Salir de la mesa</button>
+    </div>
+    <p id="table-meta" class="muted"></p>
+    <p id="table-message" class="message"></p>
+
+    <section class="card">
+      <div id="winners-banner" class="winners-banner"></div>
+
+      <div class="table-info">
+        <span>Pote: <strong id="pot-size">$0.00</strong></span>
+        <span>Apuesta actual: <strong id="current-bet">$0.00</strong></span>
+        <span id="stage-label" class="muted">—</span>
+        <span id="turn-label" class="muted">—</span>
+      </div>
+
+      <div id="community-cards" class="cards community-cards"></div>
+
+      <div id="seats" class="seats-grid"></div>
+
+      <div id="reveals-section" class="reveals"></div>
+    </section>
+
+    <section class="card">
+      <h3>Tus cartas</h3>
+      <div id="hole-cards" class="cards"></div>
+
+      <div id="actions" class="actions">
+        <button class="btn" data-action="fold">Fold</button>
+        <button class="btn" data-action="check">Check</button>
+        <button class="btn" data-action="call">Igualar</button>
+        <span class="raise-field">
+          <input id="raise-amount" type="number" min="0" step="0.01" placeholder="Nuevo total ($)">
+          <button class="btn" data-action="raise">Raise</button>
+        </span>
+        <button class="btn" data-action="all-in">All-in</button>
+      </div>
+      <p class="muted">
+        El raise es el nuevo total y debe respetar el mínimo legal de la calle.
+        Las fichas son reales (wallet): tu saldo se reserva al entrar y se liquida al salir.
+        Tras el showdown verás las cartas de los rivales y la siguiente mano arranca en segundos.
+      </p>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/poker-table.js"></script>
+</body>
+</html>

@@ -38,8 +38,6 @@ services:
       POSTGRES_USER: ${WALLET_DB_USER:-casino_user}
       POSTGRES_PASSWORD: ${WALLET_DB_PASSWORD:-casino_pass}
       POSTGRES_DB: ${WALLET_DB_NAME:-wallet_db}
-    ports:
-      - "${WALLET_DB_PORT:-5434}:5432"
     volumes:
       - wallet_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -80,8 +78,6 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${BJ_DB_USER:-casino_user}
       MONGO_INITDB_ROOT_PASSWORD: ${BJ_DB_PASSWORD:-casino_pass}
       MONGO_INITDB_DATABASE: ${BJ_DB_NAME:-bj_state_db}
-    ports:
-      - "${BJ_DB_PORT:-27017}:27017"
     volumes:
       - bj_mongo_data:/data/db
     healthcheck:
@@ -161,8 +157,6 @@ services:
       DB_PASSWORD: ${WALLET_DB_PASSWORD:-casino_pass}
       DB_NAME: ${WALLET_DB_NAME:-wallet_db}
       DB_SSLMODE: ${WALLET_DB_SSLMODE:-disable}
-    ports:
-      - "${WALLET_PORT:-50051}:50051"
     networks:
       - casino-net
 
@@ -184,8 +178,6 @@ services:
       MONGO_DB_NAME: ${BJ_DB_NAME:-bj_state_db}
       WALLET_SERVICE_URL: wallet:50051
       HISTORY_SERVICE_URL: ${HISTORY_SERVICE_URL:-history:50053}
-    ports:
-      - "${BJ_PORT:-50052}:50052"
     networks:
       - casino-net
 
@@ -202,8 +194,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       ACCESS_TTL: ${ACCESS_TTL:-15m}
       REFRESH_TTL: ${REFRESH_TTL:-168h}
-    ports:
-      - "${USERS_GRPC_PORT:-50056}:50056"
     depends_on:
       postgres-users:
         condition: service_healthy
@@ -213,20 +203,22 @@ services:
   # Poker Service (Alex Sáez)
   poker:
     build:
-      context: ./poker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: poker/Dockerfile
     container_name: poker
     restart: unless-stopped
+    depends_on:
+      mongo-poker:
+        condition: service_healthy
+      wallet:
+        condition: service_started
     environment:
       GRPC_PORT: ${POKER_GRPC_PORT:-50055}
       MONGO_URI: mongodb://mongo-poker:27017
       MONGO_DB: ${MONGO_POKER_DB:-poker_state_db}
       HISTORY_ADDR: ${HISTORY_ADDR:-history:50053}
-    ports:
-      - "${POKER_GRPC_PORT:-50055}:50055"
-    depends_on:
-      mongo-poker:
-        condition: service_healthy
+      WALLET_SERVICE_URL: wallet:${WALLET_PORT:-50051}
+      SETTLE_DISPLAY_SECONDS: ${SETTLE_DISPLAY_SECONDS:-10}
     networks:
       - casino-net
 
@@ -241,8 +233,6 @@ services:
       GRPC_PORT: ${HISTORY_GRPC_PORT:-50053}
       MONGO_URI: mongodb://mongo-history:27017
       MONGO_DB: ${MONGO_HISTORY_DB:-audit_history_db}
-    ports:
-      - "${HISTORY_GRPC_PORT:-50053}:50053"
     depends_on:
       mongo-history:
         condition: service_healthy
@@ -263,8 +253,6 @@ services:
       HISTORY_ADDR: ${HISTORY_ADDR:-history:50053}
       RECONNECT_INITIAL_MS: ${RECONNECT_INITIAL_MS:-1000}
       RECONNECT_MAX_MS: ${RECONNECT_MAX_MS:-30000}
-    ports:
-      - "${STATS_GRPC_PORT:-50054}:50054"
     depends_on:
       mongo-stats:
         condition: service_healthy

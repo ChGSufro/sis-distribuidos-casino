@@ -3,6 +3,8 @@ module github.com/ChGSufro/sis-distribuidos-casino/poker
 go 1.27.0
 
 require (
+	github.com/ChGSufro/sis-distribuidos-casino/wallet v0.0.0
+	github.com/google/uuid v1.6.0
 	go.mongodb.org/mongo-driver v1.17.10
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
@@ -23,3 +25,5 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 )
+
+replace github.com/ChGSufro/sis-distribuidos-casino/wallet => ../wallet

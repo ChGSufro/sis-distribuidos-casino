@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
-	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/game"
 	"github.com/ChGSufro/sis-distribuidos-casino/poker/internal/store"
+	pb "github.com/ChGSufro/sis-distribuidos-casino/poker/pb"
+	"github.com/google/uuid"
 )
 
 const walletTimeout = 5 * time.Second
@@ -22,6 +24,10 @@ func (s *PokerService) ListTables(ctx context.Context, req *pb.ListTablesRequest
 	}
 	out := make([]*pb.Table, 0, len(tables))
 	for _, t := range tables {
+		// Sin filtro explicito el lobby no debe ver mesas cerradas.
+		if status == "" && t.Status == game.TableClosed {
+			continue
+		}
 		out = append(out, tableToPB(t))
 	}
 	return &pb.ListTablesResponse{Tables: out}, nil
@@ -34,19 +40,54 @@ func (s *PokerService) CreateTable(ctx context.Context, req *pb.CreateTableReque
 		req.GetMaxPlayers() < 2 || req.GetMaxPlayers() > 10 {
 		return nil, ErrInvalidArgument
 	}
+	if req.GetUserId() == "" {
+		return nil, ErrInvalidArgument
+	}
 
 	table := &game.Table{
 		Name:            name,
 		SmallBlindCents: req.GetSmallBlindCents(),
 		BigBlindCents:   req.GetBigBlindCents(),
 		MaxPlayers:      req.GetMaxPlayers(),
+		MinBuyInCents:   req.GetMinBuyInCents(),
+		MaxBuyInCents:   req.GetMaxBuyInCents(),
 		Status:          game.TableWaiting,
+		CreatedBy:       req.GetUserId(),
 		DealerPosition:  -1,
 	}
 	if err := s.repo.CreateTable(ctx, table); err != nil {
 		return nil, err
 	}
-	return &pb.CreateTableResponse{Table: tableToPB(table)}, nil
+
+	resp := &pb.CreateTableResponse{Table: tableToPB(table), SeatPosition: -1}
+	if buyIn := req.GetBuyInAmountCents(); buyIn > 0 {
+		lock := s.locks.get(table.ID)
+		lock.Lock()
+		defer lock.Unlock()
+		// Auto-asiento del creador: es best-effort; si falla (p. ej. fondos
+		// insuficientes en Wallet) se devuelve la mesa sin sentar y el
+		// cliente puede unirse de forma normal.
+		seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), buyIn, 0, req.GetHoldIdempotencyKey())
+		if err == nil {
+			if err := s.repo.UpdateTable(ctx, table); err != nil {
+				// Compensacion: sin asiento persistido, liberamos la reserva.
+				relCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+				defer cancel()
+				_ = s.wallet.Release(relCtx, holdID)
+				return nil, err
+			}
+			resp.Table = tableToPB(table)
+			resp.SeatPosition = seatPos
+			resp.HoldId = holdID
+			s.emitPlayerBuyin(ctx, table, req.GetUserId(), buyIn, holdID)
+			if err := s.maybeStartRound(ctx, table); err != nil {
+				return nil, err
+			}
+		} else {
+			log.Printf("CreateTable: auto-asiento del creador omitido: %v", err)
+		}
+	}
+	return resp, nil
 }
 
 func (s *PokerService) JoinTable(ctx context.Context, req *pb.JoinTableRequest) (*pb.JoinTableResponse, error) {
@@ -68,32 +109,19 @@ func (s *PokerService) JoinTable(ctx context.Context, req *pb.JoinTableRequest) 
 	if table.Status == game.TableClosed {
 		return nil, ErrInvalidArgument
 	}
-	if table.SeatByUser(req.GetUserId()) != nil {
-		return nil, ErrAlreadySeated
-	}
 
-	seatPos, err := assignSeat(table, req.GetPreferredSeat())
+	seatPos, holdID, err := s.seatPlayer(ctx, table, req.GetUserId(), req.GetBuyInAmountCents(), req.GetPreferredSeat(), req.GetHoldIdempotencyKey())
 	if err != nil {
 		return nil, err
 	}
-
-	holdCtx, cancel := context.WithTimeout(ctx, walletTimeout)
-	defer cancel()
-	holdID, err := s.wallet.Hold(holdCtx, req.GetUserId(), req.GetBuyInAmountCents(), "poker", table.ID, req.GetTableId()+":"+req.GetUserId())
-	if err != nil {
-		return nil, err
-	}
-
-	table.Seats = append(table.Seats, game.Seat{
-		SeatPosition: seatPos,
-		UserID:       req.GetUserId(),
-		StackCents:   req.GetBuyInAmountCents(),
-		HoldID:       holdID,
-		Status:       game.SeatActive,
-	})
 	if err := s.repo.UpdateTable(ctx, table); err != nil {
+		// Compensacion: si no persistimos el asiento, liberamos la reserva.
+		relCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+		defer cancel()
+		_ = s.wallet.Release(relCtx, holdID)
 		return nil, err
 	}
+	s.emitPlayerBuyin(ctx, table, req.GetUserId(), req.GetBuyInAmountCents(), holdID)
 	if err := s.maybeStartRound(ctx, table); err != nil {
 		return nil, err
 	}
@@ -104,6 +132,70 @@ func (s *PokerService) JoinTable(ctx context.Context, req *pb.JoinTableRequest) 
 		StackCents:   req.GetBuyInAmountCents(),
 		HoldId:       holdID,
 	}, nil
+}
+
+// seatPlayer sienta a un usuario en la mesa (o hace rebuy si esta sentado
+// con stack 0), reservando el buy-in via Wallet.Hold. Muta table.Seats;
+// el llamador es responsable de persistirla. Debe invocarse con el lock de
+// la mesa adquirido salvo en CreateTable (mesa recien creada en memoria).
+func (s *PokerService) seatPlayer(ctx context.Context, table *game.Table, userID string, buyIn int64, preferredSeat int32, idemKey string) (int32, string, error) {
+	if buyIn < table.MinBuyIn() || buyIn > table.MaxBuyIn() {
+		return 0, "", ErrInvalidArgument
+	}
+
+	seatPos := preferredSeat
+	existing := table.SeatByUser(userID)
+	if existing != nil {
+		// Solo se permite re-compra: asiento con stack 0 (quebrado).
+		if existing.Status != game.SeatSittingOut || existing.StackCents != 0 {
+			return 0, "", ErrAlreadySeated
+		}
+		seatPos = existing.SeatPosition
+		if existing.HoldID != "" {
+			// El hold anterior cubria fichas que ya se perdieron (stack 0).
+			settleCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+			defer cancel()
+			if _, err := s.wallet.Settle(settleCtx, existing.HoldID, 0); err != nil {
+				return 0, "", err
+			}
+			existing.HoldID = ""
+		}
+	} else {
+		var err error
+		seatPos, err = assignSeat(table, preferredSeat)
+		if err != nil {
+			return 0, "", err
+		}
+	}
+
+	holdCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+	defer cancel()
+	// Wallet limita idempotency_key a VARCHAR(64). Si el cliente no provee
+	// una clave idempotente (retry perdido), generamos una nueva por intento
+	// (rebuy distinto no deduplica). Para reintentos, el cliente debe enviar
+	// la misma hold_idempotency_key.
+	if idemKey == "" {
+		idemKey = fmt.Sprintf("poker:%s", uuid.New().String())
+	}
+	holdID, err := s.wallet.Hold(holdCtx, userID, buyIn, "poker", table.ID, idemKey)
+	if err != nil {
+		return 0, "", err
+	}
+
+	if existing != nil {
+		existing.StackCents = buyIn
+		existing.HoldID = holdID
+		existing.Status = game.SeatActive
+		return seatPos, holdID, nil
+	}
+	table.Seats = append(table.Seats, game.Seat{
+		SeatPosition: seatPos,
+		UserID:       userID,
+		StackCents:   buyIn,
+		HoldID:       holdID,
+		Status:       game.SeatActive,
+	})
+	return seatPos, holdID, nil
 }
 
 func (s *PokerService) LeaveTable(ctx context.Context, req *pb.LeaveTableRequest) (*pb.LeaveTableResponse, error) {
@@ -140,11 +232,16 @@ func (s *PokerService) LeaveTable(ctx context.Context, req *pb.LeaveTableRequest
 	}
 
 	finalStack := seat.StackCents
-	settleCtx, cancel := context.WithTimeout(ctx, walletTimeout)
-	defer cancel()
-	settled, err := s.wallet.Settle(settleCtx, seat.HoldID, finalStack)
-	if err != nil {
-		return nil, err
+	settled := int64(0)
+	if seat.HoldID != "" {
+		// Sin hold (ya liquidado al quebrar) no hay nada que liquidar.
+		settleCtx, cancel := context.WithTimeout(ctx, walletTimeout)
+		defer cancel()
+		var err error
+		settled, err = s.wallet.Settle(settleCtx, seat.HoldID, finalStack)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	removeSeat(table, req.GetUserId())
@@ -154,6 +251,7 @@ func (s *PokerService) LeaveTable(ctx context.Context, req *pb.LeaveTableRequest
 	if err := s.repo.UpdateTable(ctx, table); err != nil {
 		return nil, err
 	}
+	s.emitPlayerPayout(ctx, table, req.GetUserId(), finalStack, seat.HoldID)
 
 	return &pb.LeaveTableResponse{
 		TableId:            table.ID,
@@ -236,6 +334,39 @@ func (s *PokerService) GetTableState(ctx context.Context, req *pb.GetTableStateR
 }
 
 // ───────────────────────── helpers ─────────────────────────
+
+// CloseTable marca la mesa como cerrada. Solo el creador puede hacerlo y
+// solo si no hay jugadores sentados; las mesas cerradas desaparecen del
+// lobby (ListTables las excluye por defecto) y no admiten nuevas manos.
+func (s *PokerService) CloseTable(ctx context.Context, req *pb.CloseTableRequest) (*pb.CloseTableResponse, error) {
+	if req.GetTableId() == "" || req.GetUserId() == "" {
+		return nil, ErrInvalidArgument
+	}
+
+	lock := s.locks.get(req.GetTableId())
+	lock.Lock()
+	defer lock.Unlock()
+
+	table, err := s.repo.GetTable(ctx, req.GetTableId())
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, ErrTableNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if table.CreatedBy != req.GetUserId() {
+		return nil, ErrNotCreator
+	}
+	if len(table.Seats) > 0 {
+		return nil, ErrTableHasPlayers
+	}
+
+	table.Status = game.TableClosed
+	if err := s.repo.UpdateTable(ctx, table); err != nil {
+		return nil, err
+	}
+	return &pb.CloseTableResponse{TableId: table.ID, Status: game.TableClosed}, nil
+}
 
 func assignSeat(table *game.Table, preferred int32) (int32, error) {
 	if preferred >= 0 {

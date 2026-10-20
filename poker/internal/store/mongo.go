@@ -17,9 +17,9 @@ var ErrNotFound = errors.New("documento no encontrado")
 
 // Mongo agrupa las colecciones de poker_state_db.
 type Mongo struct {
-	client  *mongo.Client
-	tables  *mongo.Collection
-	rounds  *mongo.Collection
+	client *mongo.Client
+	tables *mongo.Collection
+	rounds *mongo.Collection
 }
 
 // New conecta a MongoDB y garantiza los indices del modelo.

@@ -6,6 +6,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type APIResponse struct {
@@ -15,12 +17,29 @@ type APIResponse struct {
 	Status  int    `json:"status"`
 }
 
+// WriteJSON responde con data envuelta en APIResponse. Los mensajes protobuf
+// se serializan con protojson (no encoding/json) porque los tags generados
+// incluyen omitempty, que ELIMINA campos con valor 0 (p. ej. seat_position: 0
+// del asiento 0, current_turn, dealer_position) y rompe a los clientes.
+// EmitUnpopulated garantiza que todos los campos viajen siempre.
 func WriteJSON(w http.ResponseWriter, statusCode int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+
+	payload := any(data)
+	if msg, ok := data.(proto.Message); ok {
+		raw, err := protojson.MarshalOptions{
+			UseProtoNames:   true, // mantiene snake_case (contrato del frontend)
+			EmitUnpopulated: true, // envia tambien los campos en 0 o vacios
+		}.Marshal(msg)
+		if err == nil {
+			payload = json.RawMessage(raw)
+		}
+	}
+
 	_ = json.NewEncoder(w).Encode(APIResponse{
 		Success: statusCode >= 200 && statusCode < 300,
-		Data:    data,
+		Data:    payload,
 		Status:  statusCode,
 	})
 }

@@ -26,7 +26,10 @@ type tableDoc struct {
 	SmallBlindCents int64              `bson:"smallBlindCents"`
 	BigBlindCents   int64              `bson:"bigBlindCents"`
 	MaxPlayers      int32              `bson:"maxPlayers"`
+	MinBuyInCents   int64              `bson:"minBuyInCents,omitempty"`
+	MaxBuyInCents   int64              `bson:"maxBuyInCents,omitempty"`
 	Status          string             `bson:"status"`
+	CreatedBy       string             `bson:"createdBy,omitempty"`
 	Seats           []seatDoc          `bson:"seats"`
 	CurrentRoundID  string             `bson:"currentRoundId,omitempty"`
 	DealerPosition  int32              `bson:"dealerPosition"`
@@ -76,6 +79,9 @@ type roundDoc struct {
 	CurrentBetCents int64              `bson:"currentBetCents"`
 	TurnExpiresAt   time.Time          `bson:"turnExpiresAt"`
 	Stage           string             `bson:"stage"`
+	EndStage        string             `bson:"endStage,omitempty"`
+	BigBlindCents   int64              `bson:"bigBlindCents"`
+	LastRaiseCents  int64              `bson:"lastRaiseCents"`
 	Actions         []actionDoc        `bson:"actions"`
 	Winners         []winnerDoc        `bson:"winners"`
 	Deck            []cardDoc          `bson:"deck"`
@@ -115,7 +121,10 @@ func tableToDoc(t *game.Table) *tableDoc {
 		SmallBlindCents: t.SmallBlindCents,
 		BigBlindCents:   t.BigBlindCents,
 		MaxPlayers:      t.MaxPlayers,
+		MinBuyInCents:   t.MinBuyInCents,
+		MaxBuyInCents:   t.MaxBuyInCents,
 		Status:          t.Status,
+		CreatedBy:       t.CreatedBy,
 		Seats:           seats,
 		CurrentRoundID:  t.CurrentRoundID,
 		DealerPosition:  t.DealerPosition,
@@ -140,7 +149,10 @@ func docToTable(d *tableDoc) *game.Table {
 		SmallBlindCents: d.SmallBlindCents,
 		BigBlindCents:   d.BigBlindCents,
 		MaxPlayers:      d.MaxPlayers,
+		MinBuyInCents:   d.MinBuyInCents,
+		MaxBuyInCents:   d.MaxBuyInCents,
 		Status:          d.Status,
+		CreatedBy:       d.CreatedBy,
 		Seats:           seats,
 		CurrentRoundID:  d.CurrentRoundID,
 		DealerPosition:  d.DealerPosition,
@@ -187,6 +199,9 @@ func roundToDoc(r *game.Round) *roundDoc {
 		CurrentBetCents: r.CurrentBetCents,
 		TurnExpiresAt:   r.TurnExpiresAt,
 		Stage:           r.Stage,
+		EndStage:        r.EndStage,
+		BigBlindCents:   r.BigBlindCents,
+		LastRaiseCents:  r.LastRaiseCents,
 		Actions:         actions,
 		Winners:         winners,
 		Deck:            cardsToDoc(r.Deck),
@@ -235,6 +250,9 @@ func docToRound(d *roundDoc) *game.Round {
 		CurrentBetCents: d.CurrentBetCents,
 		TurnExpiresAt:   d.TurnExpiresAt,
 		Stage:           d.Stage,
+		EndStage:        d.EndStage,
+		BigBlindCents:   d.BigBlindCents,
+		LastRaiseCents:  d.LastRaiseCents,
 		Actions:         actions,
 		Winners:         winners,
 		Deck:            cardsFromDoc(d.Deck),

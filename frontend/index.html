@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Acceso</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="auth-page">
+  <main class="auth-container">
+    <h1 class="brand">Casino</h1>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="login" type="button">Iniciar sesión</button>
+      <button class="tab" data-tab="register" type="button">Registrarse</button>
+    </div>
+
+    <section id="login-tab" class="tab-panel active">
+      <form id="login-form">
+        <label>Email
+          <input type="email" name="email" required>
+        </label>
+        <label>Contraseña
+          <input type="password" name="password" required>
+        </label>
+        <button type="submit" class="btn-primary">Entrar</button>
+      </form>
+    </section>
+
+    <section id="register-tab" class="tab-panel">
+      <form id="register-form">
+        <label>Usuario
+          <input type="text" name="username" required>
+        </label>
+        <label>Email
+          <input type="email" name="email" required>
+        </label>
+        <label>Contraseña
+          <input type="password" name="password" required minlength="6">
+        </label>
+        <button type="submit" class="btn-primary">Crear cuenta</button>
+      </form>
+    </section>
+
+    <p id="auth-message" class="message"></p>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

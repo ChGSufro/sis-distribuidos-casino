@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casino · Póker</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header id="app-nav"></header>
+
+  <main class="container">
+    <h1>Póker</h1>
+    <p id="poker-message" class="message"></p>
+
+    <section class="card">
+      <h2>Crear mesa</h2>
+      <form id="create-table-form" class="inline-form">
+        <input type="text" name="name" placeholder="Nombre de la mesa" required>
+        <input type="number" name="smallBlind" min="0.01" step="0.01" placeholder="Ciega menor ($)" required>
+        <input type="number" name="bigBlind" min="0.02" step="0.01" placeholder="Ciega mayor ($)" required>
+        <input type="number" name="maxPlayers" min="2" max="10" step="1" value="6" required>
+        <input type="number" name="buyIn" min="0" step="0.01" placeholder="Buy-in opcional ($)">
+        <button type="submit" class="btn">Crear</button>
+      </form>
+      <p class="muted">
+        Si indicas buy-in, la mesa se crea y te sienta de una (fichas reales de wallet).
+        Déjalo vacío para solo crear la mesa y unirte luego con "Unirse".
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Mesas disponibles</h2>
+      <div class="toolbar">
+        <label class="field">Estado
+          <select id="status-filter">
+            <option value="" selected>Todas</option>
+            <option value="waiting">Esperando</option>
+            <option value="active">En juego</option>
+          </select>
+        </label>
+        <button id="refresh-btn" class="btn-link" type="button">Actualizar</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Ciegas</th>
+              <th>Jugadores</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tables-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/poker.js"></script>
+</body>
+</html>

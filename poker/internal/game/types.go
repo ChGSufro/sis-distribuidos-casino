@@ -81,11 +81,37 @@ type Table struct {
 	SmallBlindCents int64
 	BigBlindCents   int64
 	MaxPlayers      int32
+	MinBuyInCents   int64 // 0 = default (10 big blinds)
+	MaxBuyInCents   int64 // 0 = default (200 big blinds)
 	Status          string
+	CreatedBy       string // user_id del creador (autoridad para cerrar la mesa)
 	Seats           []Seat
 	CurrentRoundID  string
 	DealerPosition  int32
 	CreatedAt       time.Time
+}
+
+// DefaultMinBuyIn / DefaultMaxBuyIn limitan el buy-in cuando la mesa no
+// define los suyos propios. Se expresan en multiplos del big blind.
+const (
+	DefaultMinBuyInBB = 10
+	DefaultMaxBuyInBB = 200
+)
+
+// MinBuyIn devuelve el buy-in minimo de la mesa en centavos.
+func (t *Table) MinBuyIn() int64 {
+	if t.MinBuyInCents > 0 {
+		return t.MinBuyInCents
+	}
+	return t.BigBlindCents * DefaultMinBuyInBB
+}
+
+// MaxBuyIn devuelve el buy-in maximo de la mesa en centavos.
+func (t *Table) MaxBuyIn() int64 {
+	if t.MaxBuyInCents > 0 {
+		return t.MaxBuyInCents
+	}
+	return t.BigBlindCents * DefaultMaxBuyInBB
 }
 
 // ActiveSeats devuelve los asientos que participan de una ronda. Un asiento
@@ -167,23 +193,39 @@ func RoundPlayerFromSeat(s Seat) RoundPlayer {
 
 // Round es una mano individual dentro de una mesa.
 type Round struct {
-	ID             string
-	TableID        string
-	RoundNumber    int64
-	Players        []RoundPlayer
-	CommunityCards []Card
-	PotSizeCents   int64
-	SidePots       []SidePot
-	DealerPosition int32
-	CurrentTurn    int32
+	ID              string
+	TableID         string
+	RoundNumber     int64
+	Players         []RoundPlayer
+	CommunityCards  []Card
+	PotSizeCents    int64
+	SidePots        []SidePot
+	DealerPosition  int32
+	CurrentTurn     int32
 	CurrentBetCents int64
-	TurnExpiresAt  time.Time
-	Stage          string
+	TurnExpiresAt   time.Time
+	Stage           string
+	EndStage        string // etapa en que termino (p. ej. "showdown" o la calle del fold)
+	// BigBlindCents copia el big blind de la mesa (minima apuesta inicial
+	// de cada calle) y LastRaiseCents el tamano del ultimo raise completo,
+	// para exigir el min-raise (nunca menos de la ultima subida).
+	BigBlindCents  int64
+	LastRaiseCents int64
 	Actions        []Action
 	Winners        []Winner
 	Deck           []Card
 	CreatedAt      time.Time
 	SettledAt      *time.Time
+}
+
+// MinRaiseToCents devuelve el monto TOTAL minimo (raise-to) para un raise
+// en la calle actual: big blind si no hay apuesta; en caso contrario,
+// current bet + tamano del ultimo raise completo.
+func (r *Round) MinRaiseToCents() int64 {
+	if r.CurrentBetCents == 0 {
+		return r.BigBlindCents
+	}
+	return r.CurrentBetCents + r.LastRaiseCents
 }
 
 // PlayerByUser devuelve el jugador de la ronda por userId, o nil.

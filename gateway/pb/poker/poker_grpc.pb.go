@@ -25,6 +25,7 @@ const (
 	PokerService_LeaveTable_FullMethodName    = "/poker.PokerService/LeaveTable"
 	PokerService_PlayerAction_FullMethodName  = "/poker.PokerService/PlayerAction"
 	PokerService_GetTableState_FullMethodName = "/poker.PokerService/GetTableState"
+	PokerService_CloseTable_FullMethodName    = "/poker.PokerService/CloseTable"
 )
 
 // PokerServiceClient is the client API for PokerService service.
@@ -37,6 +38,7 @@ type PokerServiceClient interface {
 	LeaveTable(ctx context.Context, in *LeaveTableRequest, opts ...grpc.CallOption) (*LeaveTableResponse, error)
 	PlayerAction(ctx context.Context, in *PlayerActionRequest, opts ...grpc.CallOption) (*PlayerActionResponse, error)
 	GetTableState(ctx context.Context, in *GetTableStateRequest, opts ...grpc.CallOption) (*GetTableStateResponse, error)
+	CloseTable(ctx context.Context, in *CloseTableRequest, opts ...grpc.CallOption) (*CloseTableResponse, error)
 }
 
 type pokerServiceClient struct {
@@ -107,6 +109,16 @@ func (c *pokerServiceClient) GetTableState(ctx context.Context, in *GetTableStat
 	return out, nil
 }
 
+func (c *pokerServiceClient) CloseTable(ctx context.Context, in *CloseTableRequest, opts ...grpc.CallOption) (*CloseTableResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloseTableResponse)
+	err := c.cc.Invoke(ctx, PokerService_CloseTable_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PokerServiceServer is the server API for PokerService service.
 // All implementations must embed UnimplementedPokerServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type PokerServiceServer interface {
 	LeaveTable(context.Context, *LeaveTableRequest) (*LeaveTableResponse, error)
 	PlayerAction(context.Context, *PlayerActionRequest) (*PlayerActionResponse, error)
 	GetTableState(context.Context, *GetTableStateRequest) (*GetTableStateResponse, error)
+	CloseTable(context.Context, *CloseTableRequest) (*CloseTableResponse, error)
 	mustEmbedUnimplementedPokerServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedPokerServiceServer) PlayerAction(context.Context, *PlayerActi
 }
 func (UnimplementedPokerServiceServer) GetTableState(context.Context, *GetTableStateRequest) (*GetTableStateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTableState not implemented")
+}
+func (UnimplementedPokerServiceServer) CloseTable(context.Context, *CloseTableRequest) (*CloseTableResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CloseTable not implemented")
 }
 func (UnimplementedPokerServiceServer) mustEmbedUnimplementedPokerServiceServer() {}
 func (UnimplementedPokerServiceServer) testEmbeddedByValue()                      {}
@@ -274,6 +290,24 @@ func _PokerService_GetTableState_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PokerService_CloseTable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseTableRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PokerServiceServer).CloseTable(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PokerService_CloseTable_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PokerServiceServer).CloseTable(ctx, req.(*CloseTableRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PokerService_ServiceDesc is the grpc.ServiceDesc for PokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var PokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTableState",
 			Handler:    _PokerService_GetTableState_Handler,
+		},
+		{
+			MethodName: "CloseTable",
+			Handler:    _PokerService_CloseTable_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

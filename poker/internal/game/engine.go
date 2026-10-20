@@ -51,6 +51,8 @@ func StartRound(table *Table, roundID string, roundNumber int64, rng *rand.Rand,
 		DealerPosition:  dealer.SeatPosition,
 		CurrentBetCents: table.BigBlindCents,
 		Stage:           StagePreflop,
+		BigBlindCents:   table.BigBlindCents,
+		LastRaiseCents:  table.BigBlindCents,
 		CreatedAt:       now,
 		Deck:            deck,
 	}
@@ -118,8 +120,9 @@ func ForceFold(table *Table, round *Round, userID string, now time.Time, ttl tim
 	return advanceIfReady(table, round, now, ttl)
 }
 
-// AutoFold aplica auto-fold al jugador en turno si expiro su tiempo.
-// Devuelve true si efectivamente se ejecuto un auto-fold.
+// AutoFold aplica la accion por defecto al jugador en turno si expiro su
+// tiempo. Si no hay apuesta que igualar comprueba (check); en caso
+// contrario se retira (fold). Devuelve true si efectivamente actuó.
 func AutoFold(table *Table, round *Round, now time.Time, ttl time.Duration) (bool, error) {
 	if round.IsSettled() || round.Stage == StageShowdown {
 		return false, nil
@@ -131,10 +134,20 @@ func AutoFold(table *Table, round *Round, now time.Time, ttl time.Duration) (boo
 	if p == nil || p.Status != PlayerActive {
 		return false, nil
 	}
-	if err := applyPlayerAction(table, round, p, ActionFold, 0, now, ttl); err != nil {
+	// Sin apuesta que igualar, el timeout comprueba en lugar de retirarse
+	// (un jugador desconectado no deberia perder la mano por nada).
+	action := ActionFold
+	if p.StreetBetCents == round.CurrentBetCents {
+		action = ActionCheck
+	}
+	if err := applyPlayerAction(table, round, p, action, 0, now, ttl); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func minRaiseTarget(round *Round) int64 {
+	return round.MinRaiseToCents()
 }
 
 func applyPlayerAction(table *Table, round *Round, p *RoundPlayer, action string, amount int64, now time.Time, ttl time.Duration) error {
@@ -151,7 +164,17 @@ func applyPlayerAction(table *Table, round *Round, p *RoundPlayer, action string
 		if amount <= round.CurrentBetCents {
 			return ErrInvalidAction
 		}
-		commit(p, amount-p.StreetBetCents)
+		// Min-raise: el raise debe alcanzar la apuesta actual mas el
+		// tamano del ultimo raise completo. La unica excepcion es ir
+		// all-in (raise corto), siempre permitido.
+		chips := amount - p.StreetBetCents
+		if chips > p.StackCents {
+			chips = p.StackCents // se clampkea: el jugador queda all-in
+		}
+		if amount < minRaiseTarget(round) && p.StackCents > chips {
+			return ErrInvalidAction
+		}
+		commit(p, chips)
 	case ActionAllIn:
 		commit(p, p.StackCents)
 	default:
@@ -167,10 +190,12 @@ func applyPlayerAction(table *Table, round *Round, p *RoundPlayer, action string
 	})
 
 	if p.Status == PlayerActive && p.StreetBetCents > round.CurrentBetCents {
+		noteRaise(round, action, p.StreetBetCents-round.CurrentBetCents)
 		round.CurrentBetCents = p.StreetBetCents
 		resetActed(round, p)
 	}
 	if p.Status == PlayerAllIn && p.StreetBetCents > round.CurrentBetCents {
+		noteRaise(round, action, p.StreetBetCents-round.CurrentBetCents)
 		round.CurrentBetCents = p.StreetBetCents
 		resetActed(round, p)
 	}
@@ -234,7 +259,7 @@ func advanceStreet(table *Table, round *Round, now time.Time, ttl time.Duration)
 		if countCanAct(round) <= 1 {
 			continue
 		}
-		next := nextActiveAfter(round, round.DealerPosition)
+		next := firstToActPostflop(round)
 		if next == nil {
 			continue
 		}
@@ -242,6 +267,18 @@ func advanceStreet(table *Table, round *Round, now time.Time, ttl time.Duration)
 		round.TurnExpiresAt = now.Add(ttl)
 		return nil
 	}
+}
+
+// firstToActPostflop devuelve quien abre la apuesta en la calle nueva.
+// En mesa llena es el SB (siguiente tras el dealer); en heads-up el
+// dealer/SB es quien actua primero tambien postflop.
+func firstToActPostflop(round *Round) *RoundPlayer {
+	if len(round.Players) == 2 {
+		if dealer := round.PlayerAt(round.DealerPosition); dealer != nil && dealer.Status == PlayerActive {
+			return dealer
+		}
+	}
+	return nextActiveAfter(round, round.DealerPosition)
 }
 
 // settleUncontested resuelve la ronda cuando solo queda un jugador sin
@@ -299,6 +336,7 @@ func settleShowdown(table *Table, round *Round, now time.Time) error {
 }
 
 func finishRound(table *Table, round *Round, now time.Time) error {
+	round.EndStage = round.Stage // guarda la etapa real de cierre antes de marcar settled
 	round.Stage = StageSettled
 	t := now
 	round.SettledAt = &t
@@ -419,8 +457,21 @@ func resetActed(round *Round, aggressor *RoundPlayer) {
 	}
 }
 
+// noteRaise actualiza el tamano del ultimo raise completo. Solo un raise
+// (o all-in) igual o mayor que el anterior cuenta como tal: un all-in
+// corto no reabre el min-raise.
+func noteRaise(round *Round, action string, delta int64) {
+	if action != ActionRaise && action != ActionAllIn {
+		return
+	}
+	if delta >= round.LastRaiseCents {
+		round.LastRaiseCents = delta
+	}
+}
+
 func resetStreet(round *Round) {
 	round.CurrentBetCents = 0
+	round.LastRaiseCents = 0
 	for i := range round.Players {
 		p := &round.Players[i]
 		p.StreetBetCents = 0
