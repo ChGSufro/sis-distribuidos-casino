@@ -231,7 +231,7 @@ docker compose ps                           # verificar que se recuperó
 ```bash
 docker volume ls                           # volúmenes del proyecto
 docker volume inspect sis-distribuidos-casino_users-pg-data
-docker compose down -v                      # ⚠️ baja TODO y borra datos persistentes
+docker compose down -v                      # baja TODO y borra datos persistentes
 ```
 
 ### Validación y limpieza
